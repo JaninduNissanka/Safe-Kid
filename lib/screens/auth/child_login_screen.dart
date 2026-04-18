@@ -30,29 +30,41 @@ class _ChildLoginScreenState extends State<ChildLoginScreen> {
 
     setState(() => _isLoading = true);
 
-    final user = await _auth.loginChild(code, name);
+    try {
+      final user = await _auth.loginChild(code, name);
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-    if (user != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Connected to Parent Successfully!")),
-      );
+      if (user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Connected to Parent Successfully!")),
+        );
 
-      // ✅ IMPORTANT FIX: pass pairingCode into ChildHomeScreen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChildHomeScreen(
-            childName: user.name,
-            pairingCode: code, // ✅ NOW SOS writes to locations/{code}
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChildHomeScreen(
+              childName: user.name,
+              pairingCode: code,
+            ),
           ),
-        ),
-      );
-    } else {
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Invalid Code. Ask your parent again.")),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      
+      final errorMsg = e.toString().replaceAll("Exception: ", "");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid Code. Ask your parent again.")),
+        SnackBar(
+          content: Text(errorMsg),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }

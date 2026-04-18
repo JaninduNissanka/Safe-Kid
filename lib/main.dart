@@ -2,8 +2,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
-import 'screens/auth/role_selection_screen.dart'; // <--- IMPORTANT LINK
+import 'services/fcm_service.dart';
+import 'screens/auth/auth_wrapper.dart'; // <--- NEW FRONT DOOR
+
+// REQUIREMENT: Top-level background handler for FCM
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print("🌙 FCM Background message received: ${message.messageId}");
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,7 +20,11 @@ void main() async {
   // 1. Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // 2. Request Permissions
+  // 2. Initialize FCM (Guardian side)
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await FcmService().init();
+
+  // 3. Request Permissions
   await _requestPermissions();
 
   // 3. Start the App
@@ -35,8 +48,8 @@ class SafeKidApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'SafeKid Pro',
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      // CHANGE THE FRONT DOOR HERE:
-      home: const RoleSelectionScreen(),
+      // USE THE AUTH WRAPPER TO REMEMBER LOGIN
+      home: const AuthWrapper(),
     );
   }
 }

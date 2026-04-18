@@ -1,1 +1,37 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"safekid-pro","appId":"1:510126692584:android:426214f1b3eaf6051bd15d","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"safekid-pro","configurations":{"android":"1:510126692584:android:426214f1b3eaf6051bd15d","ios":"1:510126692584:ios:8983f8fc9897ad0b1bd15d","macos":"1:510126692584:ios:8983f8fc9897ad0b1bd15d","web":"1:510126692584:web:cb374d586abe3f9b1bd15d","windows":"1:510126692584:web:e1c73234dbd194991bd15d"}}}}}}
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-functions-test"
+      ]
+    }
+  ],
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "safekid-pro",
+          "appId": "1:510126692584:android:426214f1b3eaf6051bd15d",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "safekid-pro",
+          "configurations": {
+            "android": "1:510126692584:android:426214f1b3eaf6051bd15d",
+            "ios": "1:510126692584:ios:8983f8fc9897ad0b1bd15d",
+            "macos": "1:510126692584:ios:8983f8fc9897ad0b1bd15d",
+            "web": "1:510126692584:web:cb374d586abe3f9b1bd15d",
+            "windows": "1:510126692584:web:e1c73234dbd194991bd15d"
+          }
+        }
+      }
+    }
+  }
+}

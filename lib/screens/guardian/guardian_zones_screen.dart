@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class GuardianZonesScreen extends StatefulWidget {
   const GuardianZonesScreen({super.key});
@@ -13,13 +15,28 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
   String _pairingCode = "Loading...";
   double _radiusMeters = 200;
   GeoPoint? _childLocation;
+  GeoPoint _zoneCenter = const GeoPoint(6.9271, 79.8612); // Default to Colombo
+  bool _hasCustomCenter = false;
   String _childName = "Child";
   bool _saving = false;
+  final Completer<GoogleMapController> _mapController = Completer();
+
+  StreamSubscription? _childSub;
+  StreamSubscription? _alertSub;
+
+  bool _isOutside = false;
 
   @override
   void initState() {
     super.initState();
     _loadPairingCodeAndChildLocation();
+  }
+
+  @override
+  void dispose() {
+    _childSub?.cancel();
+    _alertSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadPairingCodeAndChildLocation() async {
@@ -36,7 +53,9 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
     if (!mounted) return;
     setState(() => _pairingCode = code);
 
-    FirebaseFirestore.instance
+    _listenForAlerts(code);
+
+    _childSub = FirebaseFirestore.instance
         .collection('users')
         .where('guardianIds', arrayContains: user.uid)
         .snapshots()
@@ -48,24 +67,45 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
       final GeoPoint? loc = data['currentLocation'];
       final String name = data['name'] ?? "Child";
 
-      setState(() {
-        _childLocation = loc;
-        _childName = name;
-      });
+      if (mounted) {
+        setState(() {
+          _childLocation = loc;
+          _childName = name;
+          
+          if (loc != null && !_hasCustomCenter) {
+            _zoneCenter = loc;
+            _centerMap(loc.latitude, loc.longitude);
+          }
+        });
+      }
     });
+  }
+
+  void _listenForAlerts(String pairingCode) {
+    _alertSub?.cancel();
+    _alertSub = FirebaseFirestore.instance
+        .collection('alerts')
+        .doc(pairingCode)
+        .collection('items')
+        .where('status', isEqualTo: 'active')
+        .where('type', isEqualTo: 'GEOFENCE_EXIT')
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      setState(() => _isOutside = snap.docs.isNotEmpty);
+    });
+  }
+
+  Future<void> _centerMap(double lat, double lng) async {
+    if (!_mapController.isCompleted) return;
+    final controller = await _mapController.future;
+    controller.animateCamera(CameraUpdate.newLatLng(LatLng(lat, lng)));
   }
 
   Future<void> _saveSafeZone() async {
     if (_pairingCode == "Loading..." || _pairingCode == "No Code") {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Pairing code not loaded.")),
-      );
-      return;
-    }
-
-    if (_childLocation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Child location not available yet.")),
       );
       return;
     }
@@ -80,8 +120,8 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
 
       await zonesRef.add({
         'name': 'Home Zone',
-        'centerLat': _childLocation!.latitude,
-        'centerLng': _childLocation!.longitude,
+        'centerLat': _zoneCenter.latitude,
+        'centerLng': _zoneCenter.longitude,
         'radiusMeters': _radiusMeters.round(),
         'createdAt': FieldValue.serverTimestamp(),
         'isActive': true,
@@ -107,9 +147,34 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
     }
   }
 
+  Widget _buildOutsideAlert() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.red.shade600,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              "⚠️ $_childName is outside of safe area!",
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasLocation = _childLocation != null;
+    bool isUsingChild = _childLocation != null && !_hasCustomCenter;
 
     return Scaffold(
       appBar: AppBar(title: const Text("Zones")),
@@ -118,6 +183,8 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_isOutside) _buildOutsideAlert(),
+
             Card(
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14)),
@@ -131,20 +198,64 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
                     Text(
-                      hasLocation
-                          ? "Using $_childName current location"
-                          : "Waiting for child location...",
-                      style: TextStyle(
-                          color: hasLocation ? Colors.green : Colors.grey),
+                      isUsingChild
+                          ? "Auto-centered on $_childName"
+                          : "Custom Location (Tap map to change)",
+                      style: const TextStyle(color: Colors.green),
                     ),
                     const SizedBox(height: 8),
-                    if (hasLocation)
-                      Text(
-                        "Lat: ${_childLocation!.latitude.toStringAsFixed(5)}\nLng: ${_childLocation!.longitude.toStringAsFixed(5)}",
-                        style: const TextStyle(color: Colors.grey),
-                      ),
+                    Text(
+                      "Lat: ${_zoneCenter.latitude.toStringAsFixed(5)} | Lng: ${_zoneCenter.longitude.toStringAsFixed(5)}",
+                      style: const TextStyle(color: Colors.grey),
+                    ),
                   ],
                 ),
+              ),
+            ),
+
+            Container(
+              height: 180,
+              margin: const EdgeInsets.only(top: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.blue, width: 2),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: LatLng(_zoneCenter.latitude, _zoneCenter.longitude),
+                  zoom: 15,
+                ),
+                onTap: (LatLng pos) {
+                  setState(() {
+                    _zoneCenter = GeoPoint(pos.latitude, pos.longitude);
+                    _hasCustomCenter = true;
+                  });
+                },
+                circles: {
+                  Circle(
+                    circleId: const CircleId('preview_zone'),
+                    center: LatLng(_zoneCenter.latitude, _zoneCenter.longitude),
+                    radius: _radiusMeters,
+                    fillColor: Colors.blue.withOpacity(0.15),
+                    strokeColor: Colors.blue,
+                    strokeWidth: 2,
+                  )
+                },
+                markers: {
+                  Marker(
+                    markerId: const MarkerId('zone_center'),
+                    position: LatLng(_zoneCenter.latitude, _zoneCenter.longitude),
+                    infoWindow: const InfoWindow(title: "Safe Zone Center"),
+                  )
+                },
+                onMapCreated: (controller) {
+                  if (!_mapController.isCompleted) {
+                    _mapController.complete(controller);
+                  }
+                },
+                zoomControlsEnabled: false,
+                myLocationButtonEnabled: false,
               ),
             ),
 
@@ -188,7 +299,6 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
             ),
             const SizedBox(height: 10),
 
-            // ✅ SHOW SAVED ZONES LIST
             Expanded(
               child: _pairingCode == "Loading..." || _pairingCode == "No Code"
                   ? const Center(child: Text("No pairing code loaded."))
@@ -197,7 +307,6 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                           .collection('zones')
                           .doc(_pairingCode)
                           .collection('items')
-                          .orderBy('createdAt', descending: true)
                           .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
@@ -240,23 +349,39 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 subtitle: Text("Radius: ${radius}m"),
-                                trailing: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: active
-                                        ? Colors.green.withOpacity(0.15)
-                                        : Colors.grey.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    active ? "ACTIVE" : "OFF",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          active ? Colors.green : Colors.grey,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: active
+                                            ? Colors.green.withOpacity(0.15)
+                                            : Colors.grey.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        active ? "ACTIVE" : "OFF",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color:
+                                              active ? Colors.green : Colors.grey,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () {
+                                        FirebaseFirestore.instance
+                                            .collection('zones')
+                                            .doc(_pairingCode)
+                                            .collection('items')
+                                            .doc(docs[i].id)
+                                            .delete();
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ),
                             );

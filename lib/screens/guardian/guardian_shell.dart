@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../services/notification_service.dart';
 import 'guardian_dashboard.dart';
 import 'guardian_alerts_screen.dart';
 import 'guardian_zones_screen.dart';
@@ -63,6 +64,8 @@ class _GuardianShellState extends State<GuardianShell> {
   void _listenActiveAlertsCount(String pairingCode) {
     _alertsSub?.cancel();
 
+    bool isFirstLoad = true;
+
     _alertsSub = FirebaseFirestore.instance
         .collection('alerts')
         .doc(pairingCode)
@@ -71,7 +74,28 @@ class _GuardianShellState extends State<GuardianShell> {
         .snapshots()
         .listen((snap) {
       if (!mounted) return;
+      
       setState(() => _activeAlertsCount = snap.docs.length);
+
+      if (!isFirstLoad) {
+        for (var change in snap.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final data = change.doc.data();
+            if (data != null) {
+              final title = data['title'] ?? '🚨 Security Alert';
+              final msg = data['message'] ?? 'Please check the dashboard.';
+              
+              // Drop an OS-level notification!
+              NotificationService().showNotification(
+                id: change.doc.id.hashCode,
+                title: title,
+                body: msg,
+              );
+            }
+          }
+        }
+      }
+      isFirstLoad = false;
     });
   }
 

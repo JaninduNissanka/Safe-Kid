@@ -109,7 +109,11 @@ class _GuardianLoginScreenState extends State<GuardianLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Parent Login")),
+      backgroundColor: Colors.blue.shade50,
+      appBar: AppBar(
+        title: const Text("Parent Login"),
+        backgroundColor: Colors.blue,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: SingleChildScrollView(
@@ -126,10 +130,14 @@ class _GuardianLoginScreenState extends State<GuardianLoginScreen> {
               // Email Input
               TextField(
                 controller: _emailController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Email",
-                  prefixIcon: Icon(Icons.email),
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.email),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 keyboardType: TextInputType.emailAddress,
               ),
@@ -138,10 +146,14 @@ class _GuardianLoginScreenState extends State<GuardianLoginScreen> {
               // Password Input
               TextField(
                 controller: _passwordController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Password",
-                  prefixIcon: Icon(Icons.key),
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.key),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 obscureText: true,
               ),
@@ -156,7 +168,10 @@ class _GuardianLoginScreenState extends State<GuardianLoginScreen> {
                         onPressed: _handleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Text(
                           "LOGIN",

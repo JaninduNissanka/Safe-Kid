@@ -20,7 +20,12 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
   // Variables
   String _pairingCode = "Loading...";
   Set<Marker> _markers = {};
+  Set<Circle> _circles = {};
   String _childStatus = "Waiting for child to connect...";
+
+  // Multi-child support
+  List<DocumentSnapshot> _allChildren = [];
+  String? _selectedChildId;
 
   // SOS popup protection
   bool _isAlertOpen = false;
@@ -31,6 +36,12 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
       _locSub; // SOS doc
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
       _childSub; // user child stream
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      _zoneSub; // zones stream
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      _geofenceSub; // EXIT alerts stream
+
+  bool _isOutside = false;
 
   static const CameraPosition _initialPosition = CameraPosition(
     target: LatLng(6.9271, 79.8612),
@@ -48,6 +59,8 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
   void dispose() {
     _locSub?.cancel();
     _childSub?.cancel();
+    _zoneSub?.cancel();
+    _geofenceSub?.cancel();
     super.dispose();
   }
 
@@ -73,6 +86,26 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
 
     // ✅ Start SOS listener once pairing code is ready
     _startListeningToSosFromLocationsDoc(code);
+    _startListeningToActiveZones(code);
+    _startListeningToGeofenceAlerts(code);
+  }
+
+  void _startListeningToGeofenceAlerts(String pairingCode) {
+    _geofenceSub?.cancel();
+    _geofenceSub = FirebaseFirestore.instance
+        .collection('alerts')
+        .doc(pairingCode)
+        .collection('items')
+        .where('status', isEqualTo: 'active')
+        .where('type', isEqualTo: 'GEOFENCE_EXIT')
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _isOutside = snap.docs.isNotEmpty;
+      });
+      _updateMarkersAndStatus();
+    });
   }
 
   // =========================
@@ -95,6 +128,42 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
         _lastSosTsMs = tsMs;
         _showSosAlert();
       }
+    });
+  }
+
+  // =========================
+  // ZONES: listen to zones/{pairingCode}/items where isActive=true
+  // =========================
+  void _startListeningToActiveZones(String pairingCode) {
+    _zoneSub?.cancel();
+    _zoneSub = FirebaseFirestore.instance
+        .collection('zones')
+        .doc(pairingCode)
+        .collection('items')
+        .where('isActive', isEqualTo: true)
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+
+      final circles = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final lat = (data['centerLat'] as num).toDouble();
+        final lng = (data['centerLng'] as num).toDouble();
+        final radius = (data['radiusMeters'] as num).toDouble();
+
+        return Circle(
+          circleId: CircleId(doc.id),
+          center: LatLng(lat, lng),
+          radius: radius,
+          fillColor: Colors.blue.withOpacity(0.15),
+          strokeColor: Colors.blue,
+          strokeWidth: 2,
+        );
+      }).toSet();
+
+      setState(() {
+        _circles = circles;
+      });
     });
   }
 
@@ -170,41 +239,67 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
         .snapshots()
         .listen((snapshot) {
       if (!mounted) return;
-      if (snapshot.docs.isEmpty) return;
 
-      final childDoc = snapshot.docs.first;
-      final data = childDoc.data();
+      setState(() {
+        _allChildren = snapshot.docs;
 
-      final GeoPoint? location = data['currentLocation'];
-      final String name = data['name'] ?? "Child";
+        if (_selectedChildId == null && _allChildren.isNotEmpty) {
+          _selectedChildId = _allChildren.first.id;
+        }
+      });
 
-      if (location != null) {
-        _updateMap(location.latitude, location.longitude, name);
-        setState(() => _childStatus = "Tracking $name");
-      } else {
-        setState(() => _childStatus = "Waiting for child location...");
-      }
+      _updateMarkersAndStatus();
     });
   }
 
-  Future<void> _updateMap(double lat, double lng, String name) async {
-    if (!_mapController.isCompleted) return;
-    final GoogleMapController controller = await _mapController.future;
+  void _updateMarkersAndStatus() {
+    final Set<Marker> newMarkers = {};
+    String selectedStatus = "No child selected";
 
-    if (!mounted) return;
+    for (var doc in _allChildren) {
+      final data = doc.data() as Map<String, dynamic>;
+      final GeoPoint? loc = data['currentLocation'];
+      final String name = data['name'] ?? "Child";
+      final bool isSelected = doc.id == _selectedChildId;
+      final bool isOnline = data['isOnline'] ?? false;
+
+      if (loc != null) {
+        newMarkers.add(
+          Marker(
+            markerId: MarkerId(doc.id),
+            position: LatLng(loc.latitude, loc.longitude),
+            infoWindow: InfoWindow(
+                title: name, snippet: isOnline ? "Online" : "Offline"),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              _isOutside && isSelected 
+                ? BitmapDescriptor.hueRed 
+                : (isSelected ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueAzure)
+            ),
+          ),
+        );
+
+        if (isSelected) {
+          if (_isOutside) {
+            selectedStatus = "⚠️ $name IS OUTSIDE ZONE!";
+          } else {
+            selectedStatus = isOnline ? "Tracking $name" : "$name is Offline";
+          }
+
+          // Auto-center on selected child if moving
+          _centerOnSelectedChild(loc.latitude, loc.longitude);
+        }
+      }
+    }
 
     setState(() {
-      _markers = {
-        Marker(
-          markerId: const MarkerId('child'),
-          position: LatLng(lat, lng),
-          infoWindow: InfoWindow(title: name, snippet: "Active now"),
-          icon:
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-        ),
-      };
+      _markers = newMarkers;
+      _childStatus = selectedStatus;
     });
+  }
 
+  Future<void> _centerOnSelectedChild(double lat, double lng) async {
+    if (!_mapController.isCompleted) return;
+    final controller = await _mapController.future;
     controller.animateCamera(CameraUpdate.newLatLng(LatLng(lat, lng)));
   }
 
@@ -239,6 +334,7 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
       body: Column(
         children: [
           _buildPairingCard(),
+          if (_allChildren.length > 1) _buildChildSelector(),
           Expanded(child: _buildMap()),
           _buildBottomInfoBar(),
         ],
@@ -295,17 +391,93 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
     );
   }
 
+  Widget _buildChildSelector() {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: _allChildren.length,
+        itemBuilder: (context, index) {
+          final doc = _allChildren[index];
+          final data = doc.data() as Map<String, dynamic>;
+          final name = data['name'] ?? "Child";
+          final isSelected = doc.id == _selectedChildId;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              selected: isSelected,
+              label: Text(name),
+              onSelected: (selected) {
+                setState(() {
+                  _selectedChildId = doc.id;
+                });
+                _updateMarkersAndStatus();
+              },
+              selectedColor: Colors.orange.shade100,
+              checkmarkColor: Colors.orange,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildMap() {
-    return GoogleMap(
-      mapType: MapType.normal,
-      initialCameraPosition: _initialPosition,
-      markers: _markers,
-      zoomControlsEnabled: false,
-      onMapCreated: (GoogleMapController controller) {
-        if (!_mapController.isCompleted) {
-          _mapController.complete(controller);
-        }
-      },
+    return Stack(
+      children: [
+        GoogleMap(
+          mapType: MapType.normal,
+          initialCameraPosition: _initialPosition,
+          markers: _markers,
+          circles: _circles,
+          zoomControlsEnabled: false,
+          onMapCreated: (GoogleMapController controller) {
+            if (!_mapController.isCompleted) {
+              _mapController.complete(controller);
+            }
+          },
+        ),
+        if (_isOutside) _buildEmergencyBanner(),
+      ],
+    );
+  }
+
+  Widget _buildEmergencyBanner() {
+    return Positioned(
+      top: 10,
+      left: 15,
+      right: 15,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8)],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.white),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                "GEOFENCE ALERT: Child is outside!",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (_markers.isEmpty || !_mapController.isCompleted) return;
+                final controller = await _mapController.future;
+                controller.animateCamera(CameraUpdate.newLatLngZoom(_markers.first.position, 16));
+              },
+              child: const Text("LOCATE", style: TextStyle(color: Colors.white, decoration: TextDecoration.underline)),
+            )
+          ],
+        ),
+      ),
     );
   }
 
@@ -323,7 +495,11 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.gps_fixed, size: 28, color: Colors.orange),
+          Icon(
+            _isOutside ? Icons.warning_rounded : Icons.gps_fixed, 
+            size: 28, 
+            color: _isOutside ? Colors.red : Colors.orange
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -332,8 +508,11 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
               children: [
                 Text(
                   _childStatus,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 16, 
+                    fontWeight: FontWeight.bold,
+                    color: _isOutside ? Colors.red.shade700 : Colors.black
+                  ),
                 ),
                 const SizedBox(height: 2),
                 const Text(
@@ -350,7 +529,7 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
               final controller = await _mapController.future;
               controller.animateCamera(CameraUpdate.newLatLng(m.position));
             },
-            child: const Text("Center"),
+            child: Text("Center", style: TextStyle(color: _isOutside ? Colors.red : Colors.blue)),
           ),
         ],
       ),

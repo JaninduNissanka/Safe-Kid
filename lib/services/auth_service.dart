@@ -70,6 +70,29 @@ class AuthService {
       DocumentSnapshot parentDoc = query.docs.first;
       String parentId = parentDoc.id;
 
+      // 🛑 STRICT ONE-CHILD POLICY:
+      // Search for ANY child linked to this pairing code
+      QuerySnapshot existingChildren = await _db
+          .collection('users')
+          .where('guardianIds', arrayContains: parentId)
+          .where('role', isEqualTo: 'child')
+          .get();
+
+      if (existingChildren.docs.isNotEmpty) {
+        final existingChild = existingChildren.docs.first.data() as Map<String, dynamic>;
+        final existingName = existingChild['name'] ?? "";
+
+        // If names don't match, block the login
+        if (existingName.toLowerCase() != childName.toLowerCase()) {
+          throw Exception("Access Denied: This code is already in use by $existingName.");
+        }
+
+        // If name matches, clear the old session/UID record to keep things clean
+        for (var doc in existingChildren.docs) {
+          await doc.reference.delete();
+        }
+      }
+
       AppUser newChild = AppUser(
         uid: childUid,
         email: "child_$code@safekid.com",
@@ -81,6 +104,7 @@ class AuthService {
       await _db.collection('users').doc(childUid).set(newChild.toMap());
       return newChild;
     } catch (e) {
+      print("Login Error: $e");
       return null;
     }
   }

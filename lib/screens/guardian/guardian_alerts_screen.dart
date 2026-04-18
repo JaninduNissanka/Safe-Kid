@@ -39,36 +39,23 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
   }
 
   String _formatWhen(Timestamp? ts) {
-    if (ts == null) return "";
+    if (ts == null) return "Recent";
     final dt = ts.toDate();
-    final now = DateTime.now();
-
-    final isToday =
-        dt.year == now.year && dt.month == now.month && dt.day == now.day;
-
-    final yesterday = now.subtract(const Duration(days: 1));
-    final isYesterday = dt.year == yesterday.year &&
-        dt.month == yesterday.month &&
-        dt.day == yesterday.day;
-
-    String dayText;
-    if (isToday) {
-      dayText = "Today";
-    } else if (isYesterday) {
-      dayText = "Yesterday";
-    } else {
-      dayText =
-          "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
-    }
-
+    
+    // Exact format: "17 Apr 2026, 08:30:45 PM"
+    final day = dt.day.toString().padLeft(2, '0');
+    final months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    final month = months[dt.month - 1];
+    final year = dt.year;
+    
     int hour = dt.hour;
     final minute = dt.minute.toString().padLeft(2, '0');
+    final second = dt.second.toString().padLeft(2, '0');
     final ampm = hour >= 12 ? "PM" : "AM";
     hour = hour % 12;
     if (hour == 0) hour = 12;
 
-    final timeText = "$hour:$minute $ampm";
-    return "$dayText • $timeText";
+    return "$day $month $year, $hour:$minute:$second $ampm";
   }
 
   Future<void> _openMapDialog() async {
@@ -209,10 +196,8 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
                               final status =
                                   (data['status'] ?? 'active') as String;
 
-                              final Timestamp? createdAt =
-                                  data['createdAt'] is Timestamp
-                                      ? data['createdAt'] as Timestamp
-                                      : null;
+                              final dynamic rawTime = data['createdAt'] ?? data['timestamp'];
+                              final Timestamp? createdAt = rawTime is Timestamp ? rawTime : null;
 
                               final bool isSos = type == 'SOS';
                               final bool isActive = status == 'active';
