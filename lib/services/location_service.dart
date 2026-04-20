@@ -25,11 +25,9 @@ class LocationService {
   // Requirement 2: Adaptive Battery Variables
   bool _isStationaryMode = false;
 
-  Future<void> startTracking(String childId) async {
-    await _loadChildPairingCode(childId);
-    if (_pairingCode != null) {
-      _listenToActiveZones(_pairingCode!);
-    }
+  Future<void> startTracking(String childId, String pairingCode) async {
+    _pairingCode = pairingCode;
+    _listenToActiveZones(_pairingCode!);
 
     bool serviceEnabled = await _location.serviceEnabled();
     if (!serviceEnabled) {
@@ -68,16 +66,21 @@ class LocationService {
           'isOnline': true,
         });
 
-        // 2. Broadcast to "Live Tracking" for Web & Parent App
-        if (_pairingCode != null) {
-          await _db.collection('locations').doc(_pairingCode).set({
-            'latitude': lat,
-            'longitude': lng,
-            'lastUpdated': FieldValue.serverTimestamp(),
-            'name': 'Child Device',
-            'battery': 92, // Mock battery for demo
-            'isOnline': true,
-          }, SetOptions(merge: true));
+        // 2. BROADCAST TO WEB DASHBOARD (The critical link)
+        try {
+          if (_pairingCode != null) {
+            await _db.collection('locations').doc(_pairingCode).set({
+              'latitude': lat,
+              'longitude': lng,
+              'battery': 100, 
+              'name': 'jr',   
+              'lastUpdated': FieldValue.serverTimestamp(),
+              'isOnline': true,
+            }, SetOptions(merge: true));
+            print("📡 [SYNC] Web Dashboard updated: $lat, $lng");
+          }
+        } catch (e) {
+          print("❌ [SYNC ERROR] Failed to update Web: $e");
         }
 
         // Requirement 3 & 4: Process Geofences
@@ -145,10 +148,8 @@ class LocationService {
       else {
         _jitterCounters[zoneId] = 0; // Reset jitter
 
-        // Requirement 4: Resolve specific active alert if child returns
-        if (_activeExitAlertIds[zoneId] != null) {
-          await _resolveExitAlert(zoneId);
-        }
+        // Requirement 4: Resolve any active alerts when child is inside
+        await _resolveExitAlert(zoneId);
       }
     }
   }
@@ -205,21 +206,40 @@ class LocationService {
 
   Future<void> _resolveExitAlert(String zoneId) async {
     final alertId = _activeExitAlertIds[zoneId];
-    if (alertId == null) return;
-
-    await _db
-        .collection('alerts')
-        .doc(_pairingCode!)
-        .collection('items')
-        .doc(alertId)
-        .update({
-      'status': 'resolved',
-      'resolvedAt': FieldValue.serverTimestamp(),
-      'resolutionMessage': 'Child returned to zone.',
-    });
+    
+    // 🛡️ ENHANCEMENT: If memory was lost (app restart), find it in DB manually
+    if (alertId == null) {
+      final activeAlerts = await _db
+          .collection('alerts')
+          .doc(_pairingCode!)
+          .collection('items')
+          .where('zoneId', isEqualTo: zoneId)
+          .where('status', isEqualTo: 'active')
+          .get();
+      
+      for (var doc in activeAlerts.docs) {
+        await doc.reference.update({
+          'status': 'resolved',
+          'resolvedAt': FieldValue.serverTimestamp(),
+          'resolutionMessage': 'Auto-resolved: Child safely returned to zone.',
+        });
+      }
+    } else {
+      // Normal resolution flow
+      await _db
+          .collection('alerts')
+          .doc(_pairingCode!)
+          .collection('items')
+          .doc(alertId)
+          .update({
+        'status': 'resolved',
+        'resolvedAt': FieldValue.serverTimestamp(),
+        'resolutionMessage': 'Child returned to zone.',
+      });
+    }
 
     _activeExitAlertIds[zoneId] = null;
-    print("✅ ZONE RESOLVED: Child returned to $zoneId");
+    print("✅ ZONE RESOLVED: All alerts cleared for $zoneId");
   }
 
   Future<void> _loadChildPairingCode(String childId) async {

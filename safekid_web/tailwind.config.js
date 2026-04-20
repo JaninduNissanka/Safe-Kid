@@ -8,18 +8,21 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#6366f1', // Indigo/Purple matching the app
-          dark: '#4f46e5',
+          light: '#7983F5',
+          DEFAULT: '#5865F2', 
+          dark: '#4752C4',
         },
         secondary: {
-          DEFAULT: '#3b82f6', // Blue
-          dark: '#2563eb',
+          light: '#33DAFF',
+          DEFAULT: '#00D1FF', 
+          dark: '#00A3C7',
         },
-        danger: {
-          DEFAULT: '#ef4444', // Red
-          dark: '#dc2626',
+        accent: {
+          DEFAULT: '#FF4757', 
+          dark: '#E03D4B',
         },
-        background: '#f8fafc', // Slate-50
+        danger: '#FF4757',
+        background: '#f8fafc',
       },
     },
   },

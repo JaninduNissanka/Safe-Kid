@@ -1,19 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  background-color: #f8fafc;
+  --primary: #5865F2; 
+  --primary-dark: #4752C4;
+  --secondary: #00D1FF; 
+  --accent: #FF4757; 
 }
 
 body {
-  margin: 0;
-  display: flex;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: 'Outfit', sans-serif;
+  @apply bg-slate-50 text-slate-900 antialiased;
 }
 
-#root {
-  width: 100%;
+@layer utilities {
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/40;
+  }
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-gradient;
+  }
+  .bg-mesh {
+    background-color: #f8fafc;
+    background-image: 
+      radial-gradient(at 0% 0%, hsla(231,100%,77%,0.15) 0, transparent 50%), 
+      radial-gradient(at 50% 0%, hsla(186,100%,77%,0.15) 0, transparent 50%), 
+      radial-gradient(at 100% 0%, hsla(231,100%,77%,0.15) 0, transparent 50%);
+  }
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient {
+  animation: gradient 5s ease infinite;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(1deg); }
+}
+
+input, button {
+  font-family: 'Outfit', sans-serif;
 }

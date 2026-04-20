@@ -30,7 +30,8 @@ class _ChildHomeScreenState extends State<ChildHomeScreen> {
 
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      _locationService.startTracking(user.uid);
+      // ✅ Pass both UID and Pairing Code for Web Sync
+      _locationService.startTracking(user.uid, widget.pairingCode);
     }
   }
 
@@ -118,7 +119,6 @@ class _ChildHomeScreenState extends State<ChildHomeScreen> {
                   ),
                   const SizedBox(width: 15),
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         widget.childName,
@@ -132,12 +132,34 @@ class _ChildHomeScreenState extends State<ChildHomeScreen> {
                         style: TextStyle(
                           color: Colors.green,
                           fontWeight: FontWeight.bold,
+                          fontSize: 12,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Code: ${widget.pairingCode}",
-                        style: const TextStyle(color: Colors.grey),
+                      const SizedBox(height: 8),
+                      // ✅ NEW: FOR VIVA - Manual Signal Pulse
+                      InkWell(
+                        onTap: () {
+                          // This triggers a fresh location update
+                          _locationService.startTracking(FirebaseAuth.instance.currentUser!.uid, widget.pairingCode);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("📡 Signal Pushed to Web Dashboard!"), duration: Duration(milliseconds: 500)),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.sync, size: 14, color: Colors.blue),
+                              SizedBox(width: 4),
+                              Text("Sync Web", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 10)),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   )
