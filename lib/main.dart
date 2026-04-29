@@ -5,9 +5,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'services/fcm_service.dart';
-import 'screens/auth/auth_wrapper.dart'; // <--- NEW FRONT DOOR
+import 'screens/auth/auth_wrapper.dart';
+import 'package:provider/provider.dart';
+import 'providers/settings_provider.dart';
 
-// REQUIREMENT: Top-level background handler for FCM
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -16,19 +17,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 1. Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // 2. Initialize FCM (Guardian side)
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await FcmService().init();
-
-  // 3. Request Permissions
   await _requestPermissions();
-
-  // 3. Start the App
-  runApp(const SafeKidApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ],
+      child: const SafeKidApp(),
+    ),
+  );
 }
 
 Future<void> _requestPermissions() async {
@@ -44,11 +44,45 @@ class SafeKidApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = Provider.of<SettingsProvider>(context);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SafeKid Pro',
-      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      // USE THE AUTH WRAPPER TO REMEMBER LOGIN
+      themeMode: settings.themeMode,
+      theme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Outfit',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
+          surface: const Color(0xFFF8FAFC),
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF1E293B),
+          elevation: 0,
+        ),
+        cardColor: Colors.white,
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Outfit',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+          surface: const Color(0xFF1E293B),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E293B),
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        cardColor: const Color(0xFF1E293B),
+      ),
+      locale: settings.locale,
       home: const AuthWrapper(),
     );
   }

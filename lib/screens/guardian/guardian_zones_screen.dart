@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class GuardianZonesScreen extends StatefulWidget {
   const GuardianZonesScreen({super.key});
@@ -12,87 +12,51 @@ class GuardianZonesScreen extends StatefulWidget {
 }
 
 class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
-  String _pairingCode = "Loading...";
-  double _radiusMeters = 200;
-  GeoPoint? _childLocation;
-  GeoPoint _zoneCenter = const GeoPoint(6.9271, 79.8612); // Default to Colombo
-  bool _hasCustomCenter = false;
-  String _childName = "Child";
-  bool _saving = false;
   final Completer<GoogleMapController> _mapController = Completer();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  StreamSubscription? _childSub;
-  StreamSubscription? _alertSub;
+  String _pairingCode = "Loading...";
+  double _radiusMeters = 1000;
+  GeoPoint _zoneCenter = const GeoPoint(6.9271, 79.8612);
+  bool _hasCustomCenter = false;
+  bool _saving = false;
 
-  bool _isOutside = false;
+  StreamSubscription? _childLocSub;
 
   @override
   void initState() {
     super.initState();
-    _loadPairingCodeAndChildLocation();
+    _loadCode();
   }
 
   @override
   void dispose() {
-    _childSub?.cancel();
-    _alertSub?.cancel();
+    _childLocSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadPairingCodeAndChildLocation() async {
+  Future<void> _loadCode() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
-    final guardianDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    final code = guardianDoc.data()?['pairingCode'] ?? "No Code";
-
-    if (!mounted) return;
-    setState(() => _pairingCode = code);
-
-    _listenForAlerts(code);
-
-    _childSub = FirebaseFirestore.instance
-        .collection('users')
-        .where('guardianIds', arrayContains: user.uid)
-        .snapshots()
-        .listen((snap) {
-      if (!mounted) return;
-      if (snap.docs.isEmpty) return;
-
-      final data = snap.docs.first.data();
-      final GeoPoint? loc = data['currentLocation'];
-      final String name = data['name'] ?? "Child";
-
-      if (mounted) {
-        setState(() {
-          _childLocation = loc;
-          _childName = name;
-          
-          if (loc != null && !_hasCustomCenter) {
-            _zoneCenter = loc;
-            _centerMap(loc.latitude, loc.longitude);
-          }
-        });
-      }
-    });
+    final doc = await _db.collection('users').doc(user.uid).get();
+    if (doc.exists && mounted) {
+      final code = doc.data()?['pairingCode'] ?? "No Code";
+      setState(() => _pairingCode = code);
+      if (code != "No Code") _startChildLocationListener(code);
+    }
   }
 
-  void _listenForAlerts(String pairingCode) {
-    _alertSub?.cancel();
-    _alertSub = FirebaseFirestore.instance
-        .collection('alerts')
-        .doc(pairingCode)
-        .collection('items')
-        .where('status', isEqualTo: 'active')
-        .where('type', isEqualTo: 'GEOFENCE_EXIT')
-        .snapshots()
-        .listen((snap) {
-      if (!mounted) return;
-      setState(() => _isOutside = snap.docs.isNotEmpty);
+  void _startChildLocationListener(String code) {
+    _childLocSub = _db.collection('locations').doc(code).snapshots().listen((snap) {
+      if (snap.exists && mounted && !_hasCustomCenter) {
+        final data = snap.data()!;
+        final lat = (data['latitude'] as num).toDouble();
+        final lng = (data['longitude'] as num).toDouble();
+        setState(() {
+          _zoneCenter = GeoPoint(lat, lng);
+        });
+        _centerMap(lat, lng);
+      }
     });
   }
 
@@ -103,23 +67,20 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
   }
 
   Future<void> _saveSafeZone() async {
-    if (_pairingCode == "Loading..." || _pairingCode == "No Code") {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Pairing code not loaded.")),
-      );
-      return;
-    }
-
+    if (_pairingCode == "Loading..." || _pairingCode == "No Code") return;
     setState(() => _saving = true);
 
     try {
-      final zonesRef = FirebaseFirestore.instance
-          .collection('zones')
-          .doc(_pairingCode)
-          .collection('items');
+      final zonesRef = _db.collection('zones').doc(_pairingCode).collection('items');
+      final oldZones = await zonesRef.where('isActive', isEqualTo: true).get();
+      final batch = _db.batch();
+      for (var doc in oldZones.docs) {
+        batch.update(doc.reference, {'isActive': false});
+      }
 
-      await zonesRef.add({
-        'name': 'Home Zone',
+      final newZoneRef = zonesRef.doc();
+      batch.set(newZoneRef, {
+        'name': 'Active Safe Zone',
         'centerLat': _zoneCenter.latitude,
         'centerLng': _zoneCenter.longitude,
         'radiusMeters': _radiusMeters.round(),
@@ -127,44 +88,78 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
         'isActive': true,
       });
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Safe Zone saved successfully!"),
-          backgroundColor: Colors.green,
-        ),
-      );
+      await batch.commit();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🚀 Safe Zone Synced!")));
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to save zone: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  Widget _buildOutsideAlert() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.red.shade600,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-      ),
-      child: Row(
+  Future<void> _deleteZone(String docId) async {
+    await _db.collection('zones').doc(_pairingCode).collection('items').doc(docId).delete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Manage Safe Zones")),
+      body: Column(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
-          const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              "⚠️ $_childName is outside of safe area!",
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("1. Set Perimeter (Auto-synced to Child)", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.blue.withOpacity(0.5))),
+                    clipBehavior: Clip.antiAlias,
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(target: LatLng(_zoneCenter.latitude, _zoneCenter.longitude), zoom: 14),
+                      onMapCreated: (c) => _mapController.complete(c),
+                      onTap: (pos) => setState(() {
+                        _zoneCenter = GeoPoint(pos.latitude, pos.longitude);
+                        _hasCustomCenter = true;
+                      }),
+                      circles: {
+                        Circle(
+                          circleId: const CircleId('preview'),
+                          center: LatLng(_zoneCenter.latitude, _zoneCenter.longitude),
+                          radius: _radiusMeters,
+                          fillColor: Colors.blue.withOpacity(0.1),
+                          strokeColor: Colors.blue,
+                          strokeWidth: 2,
+                        )
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("Radius: ${_radiusMeters.round()}m", style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color)),
+                      ElevatedButton(
+                        onPressed: _saving ? null : _saveSafeZone,
+                        child: Text(_saving ? "Saving..." : "Apply Zone"),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: _radiusMeters,
+                    min: 100, max: 2000,
+                    onChanged: (v) => setState(() => _radiusMeters = v),
+                  ),
+                  const Divider(height: 40),
+                  const Text("2. History", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  _buildZonesList(),
+                ],
+              ),
             ),
           ),
         ],
@@ -172,227 +167,31 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    bool isUsingChild = _childLocation != null && !_hasCustomCenter;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("Zones")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_isOutside) _buildOutsideAlert(),
-
-            Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Safe Zone Center",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 8),
-                    Text(
-                      isUsingChild
-                          ? "Auto-centered on $_childName"
-                          : "Custom Location (Tap map to change)",
-                      style: const TextStyle(color: Colors.green),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Lat: ${_zoneCenter.latitude.toStringAsFixed(5)} | Lng: ${_zoneCenter.longitude.toStringAsFixed(5)}",
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
+  Widget _buildZonesList() {
+    if (_pairingCode == "Loading...") return const Center(child: CircularProgressIndicator());
+    return StreamBuilder<QuerySnapshot>(
+      stream: _db.collection('zones').doc(_pairingCode).collection('items').orderBy('createdAt', descending: true).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox();
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Text("No zones saved.", style: TextStyle(color: Colors.grey));
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            final z = docs[i].data() as Map<String, dynamic>;
+            final isActive = z['isActive'] ?? false;
+            return Card(
+              child: ListTile(
+                leading: Icon(Icons.location_on, color: isActive ? Colors.green : Colors.grey),
+                title: Text("${z['radiusMeters']}m Perimeter"),
+                trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteZone(docs[i].id)),
               ),
-            ),
-
-            Container(
-              height: 180,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.blue, width: 2),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(_zoneCenter.latitude, _zoneCenter.longitude),
-                  zoom: 15,
-                ),
-                onTap: (LatLng pos) {
-                  setState(() {
-                    _zoneCenter = GeoPoint(pos.latitude, pos.longitude);
-                    _hasCustomCenter = true;
-                  });
-                },
-                circles: {
-                  Circle(
-                    circleId: const CircleId('preview_zone'),
-                    center: LatLng(_zoneCenter.latitude, _zoneCenter.longitude),
-                    radius: _radiusMeters,
-                    fillColor: Colors.blue.withOpacity(0.15),
-                    strokeColor: Colors.blue,
-                    strokeWidth: 2,
-                  )
-                },
-                markers: {
-                  Marker(
-                    markerId: const MarkerId('zone_center'),
-                    position: LatLng(_zoneCenter.latitude, _zoneCenter.longitude),
-                    infoWindow: const InfoWindow(title: "Safe Zone Center"),
-                  )
-                },
-                onMapCreated: (controller) {
-                  if (!_mapController.isCompleted) {
-                    _mapController.complete(controller);
-                  }
-                },
-                zoomControlsEnabled: false,
-                myLocationButtonEnabled: false,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            const Text("Radius (meters)",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 6),
-            Text("${_radiusMeters.round()} m",
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Slider(
-              value: _radiusMeters,
-              min: 50,
-              max: 1000,
-              divisions: 19,
-              label: "${_radiusMeters.round()} m",
-              onChanged: (v) => setState(() => _radiusMeters = v),
-            ),
-
-            const SizedBox(height: 12),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _saving ? null : _saveSafeZone,
-                icon: const Icon(Icons.save),
-                label: Text(_saving ? "Saving..." : "Save Safe Zone"),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-            const Divider(),
-
-            const Text(
-              "Saved Zones",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 10),
-
-            Expanded(
-              child: _pairingCode == "Loading..." || _pairingCode == "No Code"
-                  ? const Center(child: Text("No pairing code loaded."))
-                  : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('zones')
-                          .doc(_pairingCode)
-                          .collection('items')
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return Center(
-                              child: Text("Error: ${snapshot.error}"));
-                        }
-                        if (!snapshot.hasData) {
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        }
-
-                        final docs = snapshot.data!.docs;
-                        if (docs.isEmpty) {
-                          return const Center(
-                              child: Text("No zones saved yet."));
-                        }
-
-                        return ListView.separated(
-                          itemCount: docs.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, i) {
-                            final z = docs[i].data();
-                            final name = z['name'] ?? 'Zone';
-                            final radius = z['radiusMeters'] ?? 0;
-                            final active = z['isActive'] == true;
-
-                            return Card(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.my_location,
-                                  color: active ? Colors.green : Colors.grey,
-                                ),
-                                title: Text(
-                                  name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                subtitle: Text("Radius: ${radius}m"),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: active
-                                            ? Colors.green.withOpacity(0.15)
-                                            : Colors.grey.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        active ? "ACTIVE" : "OFF",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color:
-                                              active ? Colors.green : Colors.grey,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () {
-                                        FirebaseFirestore.instance
-                                            .collection('zones')
-                                            .doc(_pairingCode)
-                                            .collection('items')
-                                            .doc(docs[i].id)
-                                            .delete();
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 }

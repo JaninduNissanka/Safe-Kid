@@ -31,7 +31,7 @@ class _ChildHomeScreenState extends State<ChildHomeScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       // ✅ Pass both UID and Pairing Code for Web Sync
-      _locationService.startTracking(user.uid, widget.pairingCode);
+      _locationService.startTracking(user.uid, widget.pairingCode, widget.childName);
     }
   }
 
@@ -140,7 +140,7 @@ class _ChildHomeScreenState extends State<ChildHomeScreen> {
                       InkWell(
                         onTap: () {
                           // This triggers a fresh location update
-                          _locationService.startTracking(FirebaseAuth.instance.currentUser!.uid, widget.pairingCode);
+                          _locationService.startTracking(FirebaseAuth.instance.currentUser!.uid, widget.pairingCode, widget.childName);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text("📡 Signal Pushed to Web Dashboard!"), duration: Duration(milliseconds: 500)),
                           );

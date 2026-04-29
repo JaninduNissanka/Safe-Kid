@@ -6,6 +6,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import Alerts from './pages/Alerts';
+import Settings from './pages/Settings';
 import Sidebar from './components/Sidebar';
 
 function App() {
@@ -17,6 +18,14 @@ function App() {
       setUser(u);
       setLoading(false);
     });
+    
+    // Initialize theme from localStorage
+    if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
     return () => unsubscribe();
   }, []);
 
@@ -28,14 +37,15 @@ function App() {
 
   return (
     <Router>
-      <div className="flex min-h-screen bg-background text-slate-900">
+      <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 overflow-hidden relative transition-colors duration-300">
         {user && <Sidebar />}
-        <main className={`flex-1 ${user ? 'ml-64' : ''}`}>
+        <main className="flex-1 relative w-full h-screen">
           <Routes>
             <Route path="/" element={!user ? <LandingPage /> : <Navigate to="/dashboard" />} />
             <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" />} />
             <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/alerts" element={user ? <Alerts /> : <Navigate to="/login" />} />
+            <Route path="/settings" element={user ? <Settings /> : <Navigate to="/login" />} />
           </Routes>
         </main>
       </div>

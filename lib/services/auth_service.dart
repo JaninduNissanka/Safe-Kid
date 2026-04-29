@@ -1,19 +1,18 @@
 import 'dart:math';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  // --- 1. GUARDIAN FEATURES ---
+  // --- 1. EMAIL/PASSWORD AUTHENTICATION ---
 
-  Future<String?> registerGuardian(
-    String email,
-    String password,
-    String name,
-  ) async {
+  Future<String?> registerWithEmail(String email, String password) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -25,12 +24,16 @@ class AuthService {
       AppUser newUser = AppUser(
         uid: result.user!.uid,
         email: email,
-        name: name,
+        name: email.split('@')[0], // Default name
         role: 'guardian',
         pairingCode: pairingCode,
       );
 
-      await _db.collection('users').doc(newUser.uid).set(newUser.toMap());
+      // Create user document and initialize linkedChildren array
+      Map<String, dynamic> userData = newUser.toMap();
+      userData['linkedChildren'] = [];
+
+      await _db.collection('users').doc(newUser.uid).set(userData);
       return null;
     } on FirebaseAuthException catch (e) {
       return e.message;
@@ -39,16 +42,66 @@ class AuthService {
     }
   }
 
-  Future<String?> loginGuardian(String email, String password) async {
+  Future<String?> signInWithEmail(String email, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
       return null;
     } on FirebaseAuthException catch (e) {
       return e.message;
+    } catch (e) {
+      return "Unknown error: $e";
     }
   }
 
-  // --- 2. CHILD FEATURES ---
+  // --- 2. GOOGLE SIGN-IN ---
+
+  Future<String?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return "User cancelled the sign-in process.";
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      
+      // CRITICAL DB STEP: Check if user exists, if not initialize with linkedChildren
+      final docRef = _db.collection('users').doc(userCredential.user!.uid);
+      final doc = await docRef.get();
+      
+      if (!doc.exists) {
+        String pairingCode = (100000 + Random().nextInt(900000)).toString();
+        AppUser newUser = AppUser(
+          uid: userCredential.user!.uid,
+          email: userCredential.user!.email ?? "",
+          name: userCredential.user!.displayName ?? "User",
+          role: 'guardian',
+          pairingCode: pairingCode,
+        );
+        
+        Map<String, dynamic> userData = newUser.toMap();
+        userData['linkedChildren'] = [];
+        
+        await docRef.set(userData);
+      }
+
+      return null; // Success
+    } on FirebaseAuthException catch (e) {
+      print("🔥 FirebaseAuthException in signInWithGoogle: code=${e.code}, message=${e.message}");
+      return e.message ?? "Firebase Authentication Failed";
+    } on PlatformException catch (e) {
+      print("📱 PlatformException in signInWithGoogle: code=${e.code}, message=${e.message}");
+      return e.message ?? "Google Sign-In Platform Error";
+    } catch (e) {
+      print("❌ General Exception in signInWithGoogle: $e");
+      return "Unknown error: $e";
+    }
+  }
+
+  // --- 3. CHILD LOGIN ---
 
   Future<AppUser?> loginChild(String code, String childName) async {
     try {
@@ -70,8 +123,6 @@ class AuthService {
       DocumentSnapshot parentDoc = query.docs.first;
       String parentId = parentDoc.id;
 
-      // 🛑 STRICT ONE-CHILD POLICY:
-      // Search for ANY child linked to this pairing code
       QuerySnapshot existingChildren = await _db
           .collection('users')
           .where('guardianIds', arrayContains: parentId)
@@ -82,12 +133,10 @@ class AuthService {
         final existingChild = existingChildren.docs.first.data() as Map<String, dynamic>;
         final existingName = existingChild['name'] ?? "";
 
-        // If names don't match, block the login
         if (existingName.toLowerCase() != childName.toLowerCase()) {
-          throw Exception("Access Denied: This code is already in use by $existingName.");
+          throw Exception("Access Denied: Already in use by $existingName.");
         }
 
-        // If name matches, clear the old session/UID record to keep things clean
         for (var doc in existingChildren.docs) {
           await doc.reference.delete();
         }
@@ -109,107 +158,65 @@ class AuthService {
     }
   }
 
-  // ===============================
-  // 3) SOS + ALERT LOGGING (Option A)
-  // locations/{pairingCode}
-  // alerts/{pairingCode}/items/{alertId}
-  // ===============================
+  // --- 4. SIGN OUT ---
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> locationStream(
-      String pairingCode) {
+  Future<void> signOut() async {
+    try {
+      await _googleSignIn.signOut();
+      await _auth.signOut();
+    } catch (e) {
+      print("Sign Out Error: $e");
+      await _auth.signOut();
+    }
+  }
+
+  // --- STREAMS & UTILS ---
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> locationStream(String pairingCode) {
     return _db.collection('locations').doc(pairingCode).snapshots();
   }
 
-  /// If isActive == true:
-  /// - Set locations/{code}.isSosActive=true
-  /// - Create alerts/{code}/items/{alertId} status=active
-  /// - Save locations/{code}.activeSosAlertId=alertId
-  ///
-  /// If isActive == false:
-  /// - Set locations/{code}.isSosActive=false
-  /// - If activeSosAlertId exists => mark that alert resolved
-  /// - Clear activeSosAlertId
-  Future<void> setSos({
-    required String pairingCode,
-    required bool isActive,
-  }) async {
+  Future<void> setSos({required String pairingCode, required bool isActive}) async {
     final locRef = _db.collection('locations').doc(pairingCode);
-
     if (isActive) {
-      // Create a new alert item
-      final alertRef =
-          _db.collection('alerts').doc(pairingCode).collection('items').doc();
+      final alertRef = _db.collection('alerts').doc(pairingCode).collection('items').doc();
       final alertId = alertRef.id;
-
       final batch = _db.batch();
-
-      batch.set(
-        alertRef,
-        {
-          'type': 'SOS',
-          'title': 'SOS Triggered',
-          'message': 'Child pressed SOS',
-          'status': 'active',
-          'createdAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-
-      batch.set(
-        locRef,
-        {
-          'isSosActive': true,
-          'sosTriggeredAt': FieldValue.serverTimestamp(),
-          'sosStatus': 'active',
-          'activeSosAlertId': alertId,
-        },
-        SetOptions(merge: true),
-      );
-
+      batch.set(alertRef, {
+        'type': 'SOS', 'title': 'SOS Triggered', 'message': 'Child pressed SOS',
+        'status': 'active', 'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      batch.set(locRef, {
+        'isSosActive': true, 'sosTriggeredAt': FieldValue.serverTimestamp(),
+        'sosStatus': 'active', 'activeSosAlertId': alertId,
+      }, SetOptions(merge: true));
       await batch.commit();
     } else {
-      // Resolve: need to know which alert is active
       final locSnap = await locRef.get();
       final data = locSnap.data();
       final String? activeAlertId = data?['activeSosAlertId'];
-
       final batch = _db.batch();
-
-      // Turn off SOS in location doc
-      batch.set(
-        locRef,
-        {
-          'isSosActive': false,
-          'sosStatus': 'resolved',
-          'activeSosAlertId': FieldValue.delete(),
-          'sosResolvedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-
-      // Mark alert resolved (if exists)
+      batch.set(locRef, {
+        'isSosActive': false, 'sosStatus': 'resolved',
+        'activeSosAlertId': FieldValue.delete(), 'sosResolvedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       if (activeAlertId != null && activeAlertId.isNotEmpty) {
-        final alertRef = _db
-            .collection('alerts')
-            .doc(pairingCode)
-            .collection('items')
-            .doc(activeAlertId);
-
-        batch.set(
-          alertRef,
-          {
-            'status': 'resolved',
-            'resolvedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
+        final alertRef = _db.collection('alerts').doc(pairingCode).collection('items').doc(activeAlertId);
+        batch.set(alertRef, {
+          'status': 'resolved', 'resolvedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
-
       await batch.commit();
     }
   }
 
-  Future<void> signOut() async {
-    await _auth.signOut();
+  Stream<DocumentSnapshot<Map<String, dynamic>>> rulesStream(String pairingCode) {
+    return _db.collection('rules').doc(pairingCode).snapshots();
+  }
+
+  Future<void> setSpeedLimit({required String pairingCode, required int speedKmh}) async {
+    await _db.collection('rules').doc(pairingCode).set({
+      'speedLimitKmh': speedKmh, 'lastUpdated': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 }

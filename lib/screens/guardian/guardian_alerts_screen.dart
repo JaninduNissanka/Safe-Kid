@@ -94,17 +94,17 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: selected ? Colors.blue : Colors.white,
+              color: selected ? Colors.blue : Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: selected ? Colors.blue : Colors.grey.shade300),
+                  color: selected ? Colors.blue : (Theme.of(context).brightness == Brightness.light ? Colors.grey.shade300 : Colors.white10)),
             ),
             child: Center(
               child: Text(
                 label,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: selected ? Colors.white : Colors.black87,
+                  color: selected ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
                 ),
               ),
             ),
@@ -256,8 +256,8 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(message,
-                                                  style: const TextStyle(
-                                                      color: Colors.black87)),
+                                                  style: TextStyle(
+                                                      color: Theme.of(context).textTheme.bodyMedium?.color)),
                                               const SizedBox(height: 6),
                                               Text(
                                                 _formatWhen(createdAt),

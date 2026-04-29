@@ -25,9 +25,16 @@ class LocationService {
   // Requirement 2: Adaptive Battery Variables
   bool _isStationaryMode = false;
 
-  Future<void> startTracking(String childId, String pairingCode) async {
+  // --- TELEMETRY ENGINE VARIABLES ---
+  StreamSubscription<DocumentSnapshot>? _rulesSubscription;
+  int _speedLimitKmh = 40;
+  int _speedJitterCount = 0;
+  DateTime? _lastSpeedAlertTime;
+
+  Future<void> startTracking(String childId, String pairingCode, String childName) async {
     _pairingCode = pairingCode;
     _listenToActiveZones(_pairingCode!);
+    _listenToParentalRules(_pairingCode!);
 
     bool serviceEnabled = await _location.serviceEnabled();
     if (!serviceEnabled) {
@@ -59,6 +66,9 @@ class LocationService {
         // Requirement 2: Adaptive Battery Logic
         _applyAdaptiveBattery(speed);
 
+        // --- SPEED TELEMETRY EVALUATION ---
+        _evaluateSpeed(childId, speed);
+
         // 1. Update Private Profile
         await _db.collection('users').doc(childId).update({
           'currentLocation': GeoPoint(lat, lng),
@@ -73,7 +83,7 @@ class LocationService {
               'latitude': lat,
               'longitude': lng,
               'battery': 100, 
-              'name': 'jr',   
+              'name': childName,   
               'lastUpdated': FieldValue.serverTimestamp(),
               'isOnline': true,
             }, SetOptions(merge: true));
@@ -102,6 +112,55 @@ class LocationService {
       _activeZones = query.docs.map((d) => {'id': d.id, ...d.data()}).toList();
       print("📡 Production Sync: ${_activeZones.length} Active Zones cached.");
     });
+  }
+
+  void _listenToParentalRules(String pairingCode) {
+    _rulesSubscription?.cancel();
+    _rulesSubscription = _db.collection('rules').doc(pairingCode).snapshots().listen((snap) {
+      if (snap.exists) {
+        _speedLimitKmh = snap.data()?['speedLimitKmh'] ?? 40;
+        print("🚀 [RULES] Speed limit updated to: $_speedLimitKmh km/h");
+      }
+    });
+  }
+
+  void _evaluateSpeed(String childId, double speedMs) async {
+    final double currentKmH = speedMs * 3.6;
+    print("🚗 Telemetry: ${currentKmH.toStringAsFixed(1)} km/h (Limit: $_speedLimitKmh)");
+
+    if (currentKmH > _speedLimitKmh) {
+      _speedJitterCount++;
+      print("⚠️ Speed Jitter: $_speedJitterCount/3");
+
+      if (_speedJitterCount >= 3) {
+        // Check cooldown (5 minutes)
+        if (_lastSpeedAlertTime == null || 
+            DateTime.now().difference(_lastSpeedAlertTime!).inMinutes >= 5) {
+          
+          await _triggerSpeedAlert(childId, currentKmH);
+          _lastSpeedAlertTime = DateTime.now();
+        }
+      }
+    } else {
+      _speedJitterCount = 0; // Reset if they slowed down
+    }
+  }
+
+  Future<void> _triggerSpeedAlert(String childId, double speed) async {
+    final alertRef = _db.collection('alerts').doc(_pairingCode!).collection('items').doc();
+    
+    await alertRef.set({
+      'type': 'OVERSPEED',
+      'title': 'High Speed Detected',
+      'message': 'Child is moving at ${speed.toStringAsFixed(1)} km/h. This may indicate they are in a vehicle.',
+      'status': 'active',
+      'createdAt': FieldValue.serverTimestamp(),
+      'childId': childId,
+      'recordedSpeed': speed.round(),
+    });
+
+    _sendPushToGuardian(childId, "🚀 Speed Alert!", "Child is moving at ${speed.toStringAsFixed(1)} km/h!");
+    print("🚨 OVERSPEED ALERT SENT!");
   }
 
   // Requirement 2: Adaptive Battery Optimization
@@ -260,5 +319,6 @@ class LocationService {
   void stopTracking() {
     _locationSubscription?.cancel();
     _zoneSubscription?.cancel();
+    _rulesSubscription?.cancel();
   }
 }

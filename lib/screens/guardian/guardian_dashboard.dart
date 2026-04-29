@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -17,42 +19,25 @@ class GuardianDashboard extends StatefulWidget {
 class _GuardianDashboardState extends State<GuardianDashboard> {
   final Completer<GoogleMapController> _mapController = Completer();
 
-  // Variables
   String _pairingCode = "Loading...";
+  String _childName = "Child";
+  int _battery = 0;
+  bool _isOnline = false;
   Set<Marker> _markers = {};
   Set<Circle> _circles = {};
-  String _childStatus = "Waiting for child to connect...";
-
-  // Multi-child support
-  List<DocumentSnapshot> _allChildren = [];
-  String? _selectedChildId;
-
-  // SOS popup protection
-  bool _isAlertOpen = false;
-  int? _lastSosTsMs;
-
-  // Subscriptions
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      _locSub; // SOS doc
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-      _childSub; // user child stream
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-      _zoneSub; // zones stream
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-      _geofenceSub; // EXIT alerts stream
-
   bool _isOutside = false;
+  bool _isAlertOpen = false;
+  LatLng? _childPos;
 
-  static const CameraPosition _initialPosition = CameraPosition(
-    target: LatLng(6.9271, 79.8612),
-    zoom: 14.0,
-  );
+  StreamSubscription? _locSub;
+  StreamSubscription? _childSub;
+  StreamSubscription? _zoneSub;
+  StreamSubscription? _alertSub;
 
   @override
   void initState() {
     super.initState();
-    _fetchParentData();
-    _startListeningToChildLocationFromUsers(); // map tracking (existing)
+    _loadData();
   }
 
   @override
@@ -60,479 +45,358 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
     _locSub?.cancel();
     _childSub?.cancel();
     _zoneSub?.cancel();
-    _geofenceSub?.cancel();
+    _alertSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchParentData() async {
+  Future<void> _loadData() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    if (!doc.exists) return;
-
-    final code = doc.data()?['pairingCode'] ?? "No Code";
-
-    // ✅ FIX: prevent setState after dispose
-    if (!mounted) return;
-
-    setState(() {
-      _pairingCode = code;
-    });
-
-    // ✅ Start SOS listener once pairing code is ready
-    _startListeningToSosFromLocationsDoc(code);
-    _startListeningToActiveZones(code);
-    _startListeningToGeofenceAlerts(code);
-  }
-
-  void _startListeningToGeofenceAlerts(String pairingCode) {
-    _geofenceSub?.cancel();
-    _geofenceSub = FirebaseFirestore.instance
-        .collection('alerts')
-        .doc(pairingCode)
-        .collection('items')
-        .where('status', isEqualTo: 'active')
-        .where('type', isEqualTo: 'GEOFENCE_EXIT')
-        .snapshots()
-        .listen((snap) {
-      if (!mounted) return;
-      setState(() {
-        _isOutside = snap.docs.isNotEmpty;
-      });
-      _updateMarkersAndStatus();
-    });
-  }
-
-  // =========================
-  // SOS: listen to locations/{pairingCode}
-  // =========================
-  void _startListeningToSosFromLocationsDoc(String pairingCode) {
-    _locSub?.cancel();
-
-    _locSub = AuthService().locationStream(pairingCode).listen((snap) {
-      final data = snap.data();
-      if (data == null) return;
-
-      final bool isSos = (data['isSosActive'] ?? false) as bool;
-
-      // timestamp to avoid repeated dialogs
-      final ts = data['sosTriggeredAt'];
-      final int tsMs = ts is Timestamp ? ts.millisecondsSinceEpoch : 0;
-
-      if (isSos && !_isAlertOpen && _lastSosTsMs != tsMs) {
-        _lastSosTsMs = tsMs;
-        _showSosAlert();
-      }
-    });
-  }
-
-  // =========================
-  // ZONES: listen to zones/{pairingCode}/items where isActive=true
-  // =========================
-  void _startListeningToActiveZones(String pairingCode) {
-    _zoneSub?.cancel();
-    _zoneSub = FirebaseFirestore.instance
-        .collection('zones')
-        .doc(pairingCode)
-        .collection('items')
-        .where('isActive', isEqualTo: true)
-        .snapshots()
-        .listen((snapshot) {
-      if (!mounted) return;
-
-      final circles = snapshot.docs.map((doc) {
-        final data = doc.data();
-        final lat = (data['centerLat'] as num).toDouble();
-        final lng = (data['centerLng'] as num).toDouble();
-        final radius = (data['radiusMeters'] as num).toDouble();
-
-        return Circle(
-          circleId: CircleId(doc.id),
-          center: LatLng(lat, lng),
-          radius: radius,
-          fillColor: Colors.blue.withOpacity(0.15),
-          strokeColor: Colors.blue,
-          strokeWidth: 2,
-        );
-      }).toSet();
-
-      setState(() {
-        _circles = circles;
-      });
-    });
-  }
-
-  // --- SOS ALERT DIALOG ---
-  void _showSosAlert() {
-    if (_isAlertOpen) return;
-    if (!mounted) return;
-
-    setState(() => _isAlertOpen = true);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.red.shade50,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_rounded, color: Colors.red, size: 40),
-            SizedBox(width: 10),
-            Text(
-              "SOS ALERT!",
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: const Text(
-          "Child has pressed the SOS button!\n\nCheck their location on the map immediately.",
-          style: TextStyle(fontSize: 18),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-
-              // ✅ FIX: check mounted before setState
-              if (!mounted) return;
-              setState(() => _isAlertOpen = false);
-
-              // ✅ Pro: resolve SOS (turn off)
-              if (_pairingCode != "Loading..." && _pairingCode != "No Code") {
-                await AuthService().setSos(
-                  pairingCode: _pairingCode,
-                  isActive: false,
-                );
-              }
-            },
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text("RESOLVE"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ======================================
-  // Existing location stream (kept for now)
-  // This listens to child in users collection.
-  // Later we can move child location into locations/{pairingCode}.
-  // ======================================
-  void _startListeningToChildLocationFromUsers() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    _childSub?.cancel();
-
-    _childSub = FirebaseFirestore.instance
-        .collection('users')
-        .where('guardianIds', arrayContains: user.uid)
-        .snapshots()
-        .listen((snapshot) {
-      if (!mounted) return;
-
-      setState(() {
-        _allChildren = snapshot.docs;
-
-        if (_selectedChildId == null && _allChildren.isNotEmpty) {
-          _selectedChildId = _allChildren.first.id;
-        }
-      });
-
-      _updateMarkersAndStatus();
-    });
-  }
-
-  void _updateMarkersAndStatus() {
-    final Set<Marker> newMarkers = {};
-    String selectedStatus = "No child selected";
-
-    for (var doc in _allChildren) {
-      final data = doc.data() as Map<String, dynamic>;
-      final GeoPoint? loc = data['currentLocation'];
-      final String name = data['name'] ?? "Child";
-      final bool isSelected = doc.id == _selectedChildId;
-      final bool isOnline = data['isOnline'] ?? false;
-
-      if (loc != null) {
-        newMarkers.add(
-          Marker(
-            markerId: MarkerId(doc.id),
-            position: LatLng(loc.latitude, loc.longitude),
-            infoWindow: InfoWindow(
-                title: name, snippet: isOnline ? "Online" : "Offline"),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              _isOutside && isSelected 
-                ? BitmapDescriptor.hueRed 
-                : (isSelected ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueAzure)
-            ),
-          ),
-        );
-
-        if (isSelected) {
-          if (_isOutside) {
-            selectedStatus = "⚠️ $name IS OUTSIDE ZONE!";
-          } else {
-            selectedStatus = isOnline ? "Tracking $name" : "$name is Offline";
-          }
-
-          // Auto-center on selected child if moving
-          _centerOnSelectedChild(loc.latitude, loc.longitude);
-        }
-      }
+    if (user == null) {
+      if (mounted) setState(() => _pairingCode = "No Code");
+      return;
     }
+    
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && mounted) {
+        final code = doc.data()?['pairingCode'] ?? "No Code";
+        setState(() => _pairingCode = code);
+        if (code != "No Code") {
+          _startListeners(code);
+        }
+      } else {
+        if (mounted) setState(() => _pairingCode = "No Code");
+      }
+    } catch (e) {
+      if (mounted) setState(() => _pairingCode = "No Code");
+    }
+  }
 
-    setState(() {
-      _markers = newMarkers;
-      _childStatus = selectedStatus;
+  void _startListeners(String code) {
+    _locSub = AuthService().locationStream(code).listen((snap) {
+      if (snap.exists && (snap.data()?['isSosActive'] ?? false) && !_isAlertOpen) _showSosAlert();
+    });
+
+    _zoneSub = FirebaseFirestore.instance.collection('zones').doc(code).collection('items')
+        .where('isActive', isEqualTo: true).snapshots().listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _circles = snap.docs.map((doc) {
+          final data = doc.data();
+          return Circle(
+            circleId: CircleId(doc.id),
+            center: LatLng((data['centerLat'] as num).toDouble(), (data['centerLng'] as num).toDouble()),
+            radius: (data['radiusMeters'] as num).toDouble(),
+            fillColor: Colors.blue.withOpacity(0.08),
+            strokeColor: Colors.blue.withOpacity(0.4),
+            strokeWidth: 2,
+          );
+        }).toSet();
+      });
+      _checkGeofenceStatus();
+    });
+
+    _alertSub = FirebaseFirestore.instance.collection('alerts').doc(code).collection('items')
+        .where('status', isEqualTo: 'active').where('type', isEqualTo: 'GEOFENCE_EXIT').snapshots().listen((snap) {
+      if (!mounted) return;
+      setState(() => _isOutside = snap.docs.isNotEmpty);
+      _checkGeofenceStatus();
+    });
+
+    _childSub = FirebaseFirestore.instance.collection('locations').doc(code).snapshots().listen((snap) async {
+      if (snap.exists && mounted) {
+        final data = snap.data()!;
+        final lat = (data['latitude'] as num).toDouble();
+        final lng = (data['longitude'] as num).toDouble();
+        _childPos = LatLng(lat, lng);
+        _childName = data['name'] ?? 'Child';
+        _battery = data['battery'] ?? 0;
+        _isOnline = data['isOnline'] ?? false;
+        
+        final icon = await _createPremiumMarker(_childName, _isOutside ? Colors.red : Colors.blue);
+        
+        setState(() {
+          _markers = {
+            Marker(
+              markerId: const MarkerId('child'),
+              position: _childPos!,
+              icon: icon,
+              anchor: const Offset(0.5, 0.5),
+            )
+          };
+        });
+        _checkGeofenceStatus();
+      }
     });
   }
 
-  Future<void> _centerOnSelectedChild(double lat, double lng) async {
+  Future<BitmapDescriptor> _createPremiumMarker(String name, Color color) async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    const double size = 180.0;
+    
+    // Draw Shadow
+    final Paint shadowPaint = Paint()..color = Colors.black.withOpacity(0.2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawCircle(const Offset(size / 2, size / 2), 45, shadowPaint);
+
+    // Outer Circle
+    final Paint paint = Paint()..color = Colors.white;
+    canvas.drawCircle(const Offset(size / 2, size / 2), 40, paint);
+    
+    // Inner Glow
+    final Paint innerPaint = Paint()..color = color;
+    canvas.drawCircle(const Offset(size / 2, size / 2), 34, innerPaint);
+
+    // Icon (Child Face Placeholder)
+    final TextPainter iconPainter = TextPainter(textDirection: TextDirection.ltr);
+    iconPainter.text = const TextSpan(text: '👦', style: TextStyle(fontSize: 45));
+    iconPainter.layout();
+    iconPainter.paint(canvas, Offset(size / 2 - 25, size / 2 - 32));
+
+    // Name Label Background
+    final RRect labelRect = RRect.fromRectAndRadius(Rect.fromLTWH(size / 2 - 50, size / 2 + 35, 100, 30), const Radius.circular(15));
+    canvas.drawRRect(labelRect, Paint()..color = color);
+
+    // Name Text
+    final TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
+    textPainter.text = TextSpan(text: name, style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold));
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(size / 2 - textPainter.width / 2, size / 2 + 41));
+
+    final img = await pictureRecorder.endRecording().toImage(size.toInt(), size.toInt());
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List());
+  }
+
+  void _checkGeofenceStatus() {
+    if (_childPos == null || _circles.isEmpty) return;
+    final circle = _circles.first;
+    final distance = _calculateDistance(_childPos!, circle.center);
+    if (distance <= circle.radius && _isOutside) {
+      setState(() => _isOutside = false);
+    } else if (distance > circle.radius) {
+      setState(() => _isOutside = true);
+    }
+  }
+
+  double _calculateDistance(LatLng p1, LatLng p2) {
+    var p = 0.017453292519943295;
+    var a = 0.5 - math.cos((p2.latitude - p1.latitude) * p) / 2 + math.cos(p1.latitude * p) * math.cos(p2.latitude * p) * (1 - math.cos((p2.longitude - p1.longitude) * p)) / 2;
+    return 12742 * math.asin(math.sqrt(a)) * 1000;
+  }
+
+  Future<void> _centerOnChild() async {
+    if (_childPos == null || !_mapController.isCompleted) return;
+    final controller = await _mapController.future;
+    controller.animateCamera(CameraUpdate.newLatLngZoom(_childPos!, 16));
+  }
+
+  Future<void> _zoom(bool zoomIn) async {
     if (!_mapController.isCompleted) return;
     final controller = await _mapController.future;
-    controller.animateCamera(CameraUpdate.newLatLng(LatLng(lat, lng)));
+    if (zoomIn) controller.animateCamera(CameraUpdate.zoomIn());
+    else controller.animateCamera(CameraUpdate.zoomOut());
   }
 
-  void _copyCode() {
-    Clipboard.setData(ClipboardData(text: _pairingCode));
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text("Code Copied!")));
-  }
-
-  Future<void> _logout() async {
-    await AuthService().signOut();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-      (route) => false,
+  void _showSosAlert() {
+    _isAlertOpen = true;
+    showDialog(
+      context: context, barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        title: const Text("🚨 SOS ALERT!", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: const Text("Your child needs immediate assistance!"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), onPressed: () async { Navigator.pop(c); _isAlertOpen = false; await AuthService().setSos(pairingCode: _pairingCode, isActive: false); }, child: const Text("RESOLVE", style: TextStyle(color: Colors.white)))],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Guardian Dashboard"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          ),
-        ],
+        elevation: 0, 
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        title: Text("SafeKid Guardian", style: TextStyle(color: Theme.of(context).appBarTheme.foregroundColor, fontWeight: FontWeight.w900, fontSize: 22)),
+        actions: [IconButton(icon: const Icon(Icons.logout, color: Colors.blueGrey), onPressed: () async { await AuthService().signOut(); if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RoleSelectionScreen())); })],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          _buildPairingCard(),
-          if (_allChildren.length > 1) _buildChildSelector(),
-          Expanded(child: _buildMap()),
-          _buildBottomInfoBar(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPairingCard() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: _copyCode,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Pairing Code",
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _pairingCode,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        "Tap to copy",
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.copy),
-                onPressed: _copyCode,
-              ),
-            ],
+          GoogleMap(
+            initialCameraPosition: const CameraPosition(target: LatLng(6.9271, 79.8612), zoom: 14),
+            markers: _markers,
+            circles: _circles,
+            onMapCreated: (c) => _mapController.complete(c),
+            zoomControlsEnabled: false,
+            myLocationButtonEnabled: false,
+            mapToolbarEnabled: false,
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChildSelector() {
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: _allChildren.length,
-        itemBuilder: (context, index) {
-          final doc = _allChildren[index];
-          final data = doc.data() as Map<String, dynamic>;
-          final name = data['name'] ?? "Child";
-          final isSelected = doc.id == _selectedChildId;
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              selected: isSelected,
-              label: Text(name),
-              onSelected: (selected) {
-                setState(() {
-                  _selectedChildId = doc.id;
-                });
-                _updateMarkersAndStatus();
-              },
-              selectedColor: Colors.orange.shade100,
-              checkmarkColor: Colors.orange,
+          
+          Positioned(
+            top: 16, left: 0, right: 0,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: _buildCompactPairingPill(context),
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildMap() {
-    return Stack(
-      children: [
-        GoogleMap(
-          mapType: MapType.normal,
-          initialCameraPosition: _initialPosition,
-          markers: _markers,
-          circles: _circles,
-          zoomControlsEnabled: false,
-          onMapCreated: (GoogleMapController controller) {
-            if (!_mapController.isCompleted) {
-              _mapController.complete(controller);
-            }
-          },
-        ),
-        if (_isOutside) _buildEmergencyBanner(),
-      ],
-    );
-  }
-
-  Widget _buildEmergencyBanner() {
-    return Positioned(
-      top: 10,
-      left: 15,
-      right: 15,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8)],
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.white),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text(
-                "GEOFENCE ALERT: Child is outside!",
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (_markers.isEmpty || !_mapController.isCompleted) return;
-                final controller = await _mapController.future;
-                controller.animateCamera(CameraUpdate.newLatLngZoom(_markers.first.position, 16));
-              },
-              child: const Text("LOCATE", style: TextStyle(color: Colors.white, decoration: TextDecoration.underline)),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomInfoBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 10,
-            color: Colors.black.withOpacity(0.08),
-          )
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _isOutside ? Icons.warning_rounded : Icons.gps_fixed, 
-            size: 28, 
-            color: _isOutside ? Colors.red : Colors.orange
           ),
-          const SizedBox(width: 12),
-          Expanded(
+
+          Positioned(
+            top: 100, right: 15,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _childStatus,
-                  style: TextStyle(
-                    fontSize: 16, 
-                    fontWeight: FontWeight.bold,
-                    color: _isOutside ? Colors.red.shade700 : Colors.black
-                  ),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  "Updates every 5 seconds",
-                  style: TextStyle(color: Colors.grey),
-                ),
+                _buildMapBtn(Icons.add, () => _zoom(true)),
+                const SizedBox(height: 10),
+                _buildMapBtn(Icons.remove, () => _zoom(false)),
+                const SizedBox(height: 10),
+                _buildMapBtn(Icons.my_location, _centerOnChild, color: Colors.indigo),
               ],
             ),
           ),
-          TextButton(
-            onPressed: () async {
-              if (_markers.isEmpty || !_mapController.isCompleted) return;
-              final m = _markers.first;
-              final controller = await _mapController.future;
-              controller.animateCamera(CameraUpdate.newLatLng(m.position));
-            },
-            child: Text("Center", style: TextStyle(color: _isOutside ? Colors.red : Colors.blue)),
+
+          Positioned(
+            bottom: 30, left: 20, right: 20,
+            child: _buildPremiumStatusCard(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCompactPairingPill(BuildContext context) {
+    if (_pairingCode == "Loading...") {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    if (_pairingCode == "No Code") {
+       return const SizedBox(); 
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.vpn_key_rounded, size: 18, color: Theme.of(context).brightness == Brightness.light ? Colors.blue.shade700 : Colors.blue.shade300),
+          const SizedBox(width: 12),
+          Text(
+            _pairingCode,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 3.0,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: _pairingCode));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("📋 Code $_pairingCode copied!\nEnter this code on your child's device to link their location."),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  backgroundColor: Colors.indigo,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.copy_rounded, size: 16, color: Theme.of(context).brightness == Brightness.light ? Colors.blue.shade700 : Colors.blue.shade300),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapBtn(IconData icon, VoidCallback onTap, {Color color = Colors.black54}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2))]),
+        child: Icon(icon, color: color, size: 20),
+      ),
+    );
+  }
+
+  Widget _buildPremiumStatusCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(35),
+        border: Border.all(color: _isOutside ? Colors.red.withOpacity(0.3) : Theme.of(context).dividerColor),
+        boxShadow: [BoxShadow(color: (_isOutside ? Colors.red : Colors.black).withOpacity(0.15), blurRadius: 30, offset: const Offset(0, 10))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 60, height: 60,
+                decoration: BoxDecoration(color: _isOutside ? Colors.red.withOpacity(0.1) : Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                child: Icon(_isOutside ? Icons.warning_rounded : Icons.child_care, color: _isOutside ? Colors.red : Colors.blue, size: 30),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_childName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Theme.of(context).textTheme.bodyLarge?.color)),
+                    const SizedBox(height: 4),
+                    Text(_isOutside ? "OUTSIDE SAFE ZONE" : "Perfectly Safe", style: TextStyle(color: _isOutside ? Colors.red : Colors.green, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text("$_battery%", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                  const Text("BATTERY", style: TextStyle(color: Colors.grey, fontSize: 8, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _statusChip(Icons.wifi, _isOnline ? "ONLINE" : "OFFLINE", _isOnline ? Colors.green : Colors.grey),
+              _statusChip(Icons.location_on, _isOutside ? "BREACH" : "INSIDE", _isOutside ? Colors.red : Colors.blue),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(color: color.withOpacity(0.05), borderRadius: BorderRadius.circular(15), border: Border.all(color: color.withOpacity(0.1))),
+      child: Row(children: [Icon(icon, size: 14, color: color), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 10))]),
     );
   }
 }

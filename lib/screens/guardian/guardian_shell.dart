@@ -8,7 +8,7 @@ import 'guardian_dashboard.dart';
 import 'guardian_alerts_screen.dart';
 import 'guardian_zones_screen.dart';
 import 'guardian_rules_screen.dart';
-import 'guardian_settings_screen.dart';
+import 'guardian_profile_screen.dart';
 
 class GuardianShell extends StatefulWidget {
   const GuardianShell({super.key});
@@ -134,8 +134,8 @@ class _GuardianShellState extends State<GuardianShell> {
       const GuardianDashboard(),
       GuardianAlertsScreen(onOpenMap: _goToHome),
       const GuardianZonesScreen(),
-      const GuardianRulesScreen(),
-      const GuardianSettingsScreen(),
+      GuardianRulesScreen(pairingCode: _pairingCode),
+      const GuardianProfileScreen(),
     ];
 
     return Scaffold(
@@ -155,7 +155,7 @@ class _GuardianShellState extends State<GuardianShell> {
               icon: Icon(Icons.my_location), label: "Zones"),
           const BottomNavigationBarItem(icon: Icon(Icons.tune), label: "Rules"),
           const BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: "Settings"),
+              icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );

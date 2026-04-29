@@ -12,7 +12,20 @@
           "package_name": "com.example.safekid_pro"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "510126692584-va6u1jafajslvgj29gjerkpj31af407a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.safekid_pro",
+            "certificate_hash": "385257237ffa37fee79a5f5dc6b973a771aafda1"
+          }
+        },
+        {
+          "client_id": "510126692584-0iqut99thurn7a5lrj2e3dhqinaa59ba.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDpZmkd62TBc4hZc-JuzeHBHM4fRGhXPEk"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "510126692584-0iqut99thurn7a5lrj2e3dhqinaa59ba.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "510126692584-td3nghlatum7tps8e7qh51lekdfvjvds.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.safekidPro"
+              }
+            }
+          ]
         }
       }
     }
