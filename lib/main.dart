@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -17,16 +18,22 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await EasyLocalization.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await FcmService().init();
   await _requestPermissions();
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
-      ],
-      child: const SafeKidApp(),
+    EasyLocalization(
+      supportedLocales: const [Locale('en'), Locale('si')],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('en'),
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ],
+        child: const SafeKidApp(),
+      ),
     ),
   );
 }
@@ -82,7 +89,9 @@ class SafeKidApp extends StatelessWidget {
         ),
         cardColor: const Color(0xFF1E293B),
       ),
-      locale: settings.locale,
+      localizationsDelegates: context.localizationDelegates,
+      supportedLocales: context.supportedLocales,
+      locale: context.locale, // Overrides settings.locale to use easy_localization
       home: const AuthWrapper(),
     );
   }

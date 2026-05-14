@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../../services/auth_service.dart';
 import '../auth/role_selection_screen.dart';
 
@@ -148,7 +149,7 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
     canvas.drawCircle(const Offset(size / 2, size / 2), 34, innerPaint);
 
     // Icon (Child Face Placeholder)
-    final TextPainter iconPainter = TextPainter(textDirection: TextDirection.ltr);
+    final TextPainter iconPainter = TextPainter(textDirection: ui.TextDirection.ltr);
     iconPainter.text = const TextSpan(text: '👦', style: TextStyle(fontSize: 45));
     iconPainter.layout();
     iconPainter.paint(canvas, Offset(size / 2 - 25, size / 2 - 32));
@@ -158,7 +159,7 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
     canvas.drawRRect(labelRect, Paint()..color = color);
 
     // Name Text
-    final TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
+    final TextPainter textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
     textPainter.text = TextSpan(text: name, style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold));
     textPainter.layout();
     textPainter.paint(canvas, Offset(size / 2 - textPainter.width / 2, size / 2 + 41));
@@ -203,10 +204,10 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
     showDialog(
       context: context, barrierDismissible: false,
       builder: (c) => AlertDialog(
-        title: const Text("🚨 SOS ALERT!", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-        content: const Text("Your child needs immediate assistance!"),
+        title: Text("dashboard.sos_title".tr(), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: Text("dashboard.sos_message".tr()),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        actions: [ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), onPressed: () async { Navigator.pop(c); _isAlertOpen = false; await AuthService().setSos(pairingCode: _pairingCode, isActive: false); }, child: const Text("RESOLVE", style: TextStyle(color: Colors.white)))],
+        actions: [ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), onPressed: () async { Navigator.pop(c); _isAlertOpen = false; await AuthService().setSos(pairingCode: _pairingCode, isActive: false); }, child: Text("dashboard.resolve".tr(), style: const TextStyle(color: Colors.white)))],
       ),
     );
   }
@@ -218,7 +219,7 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
       appBar: AppBar(
         elevation: 0, 
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        title: Text("SafeKid Guardian", style: TextStyle(color: Theme.of(context).appBarTheme.foregroundColor, fontWeight: FontWeight.w900, fontSize: 22)),
+        title: Text("dashboard.title".tr(), style: TextStyle(color: Theme.of(context).appBarTheme.foregroundColor, fontWeight: FontWeight.w900, fontSize: 22)),
         actions: [IconButton(icon: const Icon(Icons.logout, color: Colors.blueGrey), onPressed: () async { await AuthService().signOut(); if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RoleSelectionScreen())); })],
       ),
       body: Stack(
@@ -307,7 +308,7 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
               Clipboard.setData(ClipboardData(text: _pairingCode));
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text("📋 Code $_pairingCode copied!\nEnter this code on your child's device to link their location."),
+                  content: Text("dashboard.copied".tr(namedArgs: {'code': _pairingCode})),
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   backgroundColor: Colors.indigo,
@@ -366,7 +367,7 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
                   children: [
                     Text(_childName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Theme.of(context).textTheme.bodyLarge?.color)),
                     const SizedBox(height: 4),
-                    Text(_isOutside ? "OUTSIDE SAFE ZONE" : "Perfectly Safe", style: TextStyle(color: _isOutside ? Colors.red : Colors.green, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
+                    Text(_isOutside ? "dashboard.outside_safe_zone".tr() : "dashboard.perfectly_safe".tr(), style: TextStyle(color: _isOutside ? Colors.red : Colors.green, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
                   ],
                 ),
               ),
@@ -374,7 +375,7 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text("$_battery%", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                  const Text("BATTERY", style: TextStyle(color: Colors.grey, fontSize: 8, fontWeight: FontWeight.bold)),
+                  Text("dashboard.battery".tr(), style: const TextStyle(color: Colors.grey, fontSize: 8, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -383,8 +384,8 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _statusChip(Icons.wifi, _isOnline ? "ONLINE" : "OFFLINE", _isOnline ? Colors.green : Colors.grey),
-              _statusChip(Icons.location_on, _isOutside ? "BREACH" : "INSIDE", _isOutside ? Colors.red : Colors.blue),
+              _statusChip(Icons.wifi, _isOnline ? "dashboard.online".tr() : "dashboard.offline".tr(), _isOnline ? Colors.green : Colors.grey),
+              _statusChip(Icons.location_on, _isOutside ? "dashboard.breach".tr() : "dashboard.inside".tr(), _isOutside ? Colors.red : Colors.blue),
             ],
           ),
         ],

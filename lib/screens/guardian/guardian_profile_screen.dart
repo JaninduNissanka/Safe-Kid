@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/auth_service.dart';
 import '../auth/guardian_login_screen.dart';
@@ -25,7 +27,7 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         toolbarHeight: 80,
         title: Text(
-          "My Profile",
+          "profile.title".tr(),
           style: TextStyle(
             color: Theme.of(context).appBarTheme.foregroundColor,
             fontWeight: FontWeight.w900,
@@ -43,10 +45,16 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
           const SizedBox(width: 8),
           // Language Toggle
           CustomAnimatedToggle(
-            value: settings.isSinhala,
-            onChanged: (val) => settings.toggleLanguage(val),
-            leftText: "EN",
-            rightText: "SI",
+            value: context.locale.languageCode == 'si',
+            onChanged: (val) {
+              if (val) {
+                context.setLocale(const Locale('si'));
+              } else {
+                context.setLocale(const Locale('en'));
+              }
+            },
+            leftText: "🇬🇧",
+            rightText: "🇱🇰",
           ),
           const SizedBox(width: 16),
         ],
@@ -110,16 +118,16 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
             const SizedBox(height: 40),
 
             // Section 1: Account Security
-            _buildSectionHeader("Account Security"),
+            _buildSectionHeader("profile.account_security".tr()),
             _buildSettingsGroup([
               _buildSettingTile(
                 icon: Icons.lock_outline,
-                title: "Change Password",
+                title: "profile.change_password".tr(),
                 onTap: () {},
               ),
               _buildSettingTile(
                 icon: Icons.security,
-                title: "Two-Factor Authentication",
+                title: "profile.two_factor".tr(),
                 trailing: Switch(
                   value: _twoFactorEnabled,
                   activeColor: Colors.indigo,
@@ -131,11 +139,11 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
             const SizedBox(height: 24),
 
             // Section 2: Preferences
-            _buildSectionHeader("Preferences"),
+            _buildSectionHeader("profile.preferences".tr()),
             _buildSettingsGroup([
               _buildSettingTile(
                 icon: Icons.notifications_none,
-                title: "Notification Settings",
+                title: "profile.notification_settings".tr(),
                 onTap: () {},
               ),
               // Dark Mode removed from here as it's now in the header
@@ -144,11 +152,11 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
             const SizedBox(height: 24),
 
             // Section 3: Danger Zone
-            _buildSectionHeader("Danger Zone", isDanger: true),
+            _buildSectionHeader("profile.danger_zone".tr(), isDanger: true),
             _buildSettingsGroup([
               _buildSettingTile(
                 icon: Icons.logout,
-                title: "Sign Out",
+                title: "profile.sign_out".tr(),
                 isDanger: true,
                 onTap: () async {
                   await AuthService().signOut();
@@ -163,7 +171,7 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
               ),
               _buildSettingTile(
                 icon: Icons.delete_forever,
-                title: "Delete Account",
+                title: "profile.delete_account".tr(),
                 isDanger: true,
                 onTap: () {},
               ),
@@ -283,7 +291,7 @@ class CustomAnimatedToggle extends StatelessWidget {
                   child: leftIcon != null
                       ? Icon(leftIcon, size: 16, color: Colors.white)
                       : leftText != null
-                          ? Text(leftText!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))
+                          ? Text(leftText!, style: const TextStyle(color: Colors.white, fontSize: 16))
                           : const SizedBox.shrink(),
                 ),
               ),
@@ -295,7 +303,7 @@ class CustomAnimatedToggle extends StatelessWidget {
                   child: rightIcon != null
                       ? Icon(rightIcon, size: 16, color: Colors.white)
                       : rightText != null
-                          ? Text(rightText!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))
+                          ? Text(rightText!, style: const TextStyle(color: Colors.white, fontSize: 16))
                           : const SizedBox.shrink(),
                 ),
               ),

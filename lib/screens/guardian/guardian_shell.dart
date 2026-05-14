@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../../services/notification_service.dart';
 import 'guardian_dashboard.dart';
@@ -99,11 +101,11 @@ class _GuardianShellState extends State<GuardianShell> {
     });
   }
 
-  Widget _badgeIcon({required IconData icon, required int count}) {
+  Widget _badgeIcon({required Widget icon, required int count}) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Icon(icon),
+        icon,
         if (count > 0)
           Positioned(
             right: -8,
@@ -130,6 +132,11 @@ class _GuardianShellState extends State<GuardianShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navBackgroundColor = isDark ? Theme.of(context).scaffoldBackgroundColor : Colors.white;
+    final borderColor = isDark ? Colors.white12 : Colors.grey.shade200;
+    final unselectedColor = isDark ? Colors.blueGrey.shade300 : Colors.blueGrey.shade400;
+
     final pages = [
       const GuardianDashboard(),
       GuardianAlertsScreen(onOpenMap: _goToHome),
@@ -140,23 +147,65 @@ class _GuardianShellState extends State<GuardianShell> {
 
     return Scaffold(
       body: pages[_index],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
-        type: BottomNavigationBarType.fixed,
-        items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(
-            icon: _badgeIcon(
-                icon: Icons.notifications, count: _activeAlertsCount),
-            label: "Alerts",
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: navBackgroundColor,
+          border: Border(
+            top: BorderSide(color: borderColor, width: 1),
           ),
-          const BottomNavigationBarItem(
-              icon: Icon(Icons.my_location), label: "Zones"),
-          const BottomNavigationBarItem(icon: Icon(Icons.tune), label: "Rules"),
-          const BottomNavigationBarItem(
-              icon: Icon(Icons.person), label: "Profile"),
-        ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _index,
+          onTap: (i) => setState(() => _index = i),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: navBackgroundColor,
+          elevation: 0,
+          selectedItemColor: const Color(0xFF5865F2), // Primary Blue
+          unselectedItemColor: unselectedColor,
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+            letterSpacing: 0.2,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w400,
+            fontSize: 12,
+            letterSpacing: 0.2,
+          ),
+          items: [
+            BottomNavigationBarItem(
+              icon: Icon(PhosphorIcons.house()),
+              activeIcon: Icon(PhosphorIcons.house(PhosphorIconsStyle.fill)),
+              label: "navigation.home".tr(),
+            ),
+            BottomNavigationBarItem(
+              icon: _badgeIcon(
+                icon: Icon(PhosphorIcons.bell()),
+                count: _activeAlertsCount,
+              ),
+              activeIcon: _badgeIcon(
+                icon: Icon(PhosphorIcons.bell(PhosphorIconsStyle.fill)),
+                count: _activeAlertsCount,
+              ),
+              label: "navigation.alerts".tr(),
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(PhosphorIcons.crosshair()),
+              activeIcon: Icon(PhosphorIcons.crosshair(PhosphorIconsStyle.fill)),
+              label: "navigation.zones".tr(),
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(PhosphorIcons.slidersHorizontal()),
+              activeIcon: Icon(PhosphorIcons.slidersHorizontal(PhosphorIconsStyle.fill)),
+              label: "navigation.rules".tr(),
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(PhosphorIcons.user()),
+              activeIcon: Icon(PhosphorIcons.user(PhosphorIconsStyle.fill)),
+              label: "navigation.profile".tr(),
+            ),
+          ],
+        ),
       ),
     );
   }

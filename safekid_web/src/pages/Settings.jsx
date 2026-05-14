@@ -3,12 +3,14 @@ import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   User, Lock, ShieldCheck, Bell, LogOut, Trash2, 
   ChevronRight, Moon, Sun, Languages 
 } from 'lucide-react';
 
 const Settings = () => {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [userName, setUserName] = useState("Guardian User");
   const [email, setEmail] = useState("");
@@ -37,6 +39,12 @@ const Settings = () => {
   const handleLogout = async () => {
     await signOut(auth);
     navigate('/');
+  };
+
+  const toggleLanguage = () => {
+    const newLang = isSinhala ? 'en' : 'si';
+    i18n.changeLanguage(newLang);
+    setIsSinhala(!isSinhala);
   };
 
   const toggleTheme = () => {
@@ -80,7 +88,7 @@ const Settings = () => {
               <div className="w-12 h-12 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                 {isDarkMode ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
               </div>
-              <span className="font-bold text-lg text-slate-900 dark:text-white tracking-wide">Theme</span>
+              <span className="font-bold text-lg text-slate-900 dark:text-white tracking-wide">{t("theme")}</span>
             </div>
             <div className={`w-14 h-7 rounded-full p-1 shadow-inner transition-colors duration-300 ${isDarkMode ? 'bg-indigo-500' : 'bg-slate-600'}`}>
               <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-300 shadow-sm ${isDarkMode ? 'translate-x-7' : 'translate-x-0'}`} />
@@ -88,21 +96,21 @@ const Settings = () => {
           </div>
 
           <div 
-            onClick={() => setIsSinhala(!isSinhala)}
+            onClick={toggleLanguage}
             className="bg-white/80 dark:bg-slate-800/60 backdrop-blur-xl border border-slate-200 dark:border-slate-700/50 rounded-3xl p-6 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-lg"
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <Languages className="w-6 h-6" />
               </div>
-              <span className="font-bold text-lg text-slate-900 dark:text-white tracking-wide">Language</span>
+              <span className="font-bold text-lg text-slate-900 dark:text-white tracking-wide">{t("language")}</span>
             </div>
             <div className="flex items-center gap-3 font-black text-sm">
-              <span className={!isSinhala ? 'text-emerald-400' : 'text-slate-500'}>EN</span>
+              <span className={!isSinhala ? 'text-emerald-400' : 'text-slate-500'}>🇬🇧 EN</span>
               <div className={`w-14 h-7 rounded-full p-1 shadow-inner transition-colors duration-300 bg-emerald-500`}>
                 <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-300 shadow-sm ${isSinhala ? 'translate-x-7' : 'translate-x-0'}`} />
               </div>
-              <span className={isSinhala ? 'text-emerald-400' : 'text-slate-500'}>SI</span>
+              <span className={isSinhala ? 'text-emerald-400' : 'text-slate-500'}>🇱🇰 SI</span>
             </div>
           </div>
         </div>
@@ -112,14 +120,14 @@ const Settings = () => {
           
           {/* ACCOUNT SECURITY */}
           <section>
-            <h3 className="text-xs text-slate-500 dark:text-slate-400 font-black tracking-[0.2em] uppercase mb-4 pl-4">Account Security</h3>
+            <h3 className="text-xs text-slate-500 dark:text-slate-400 font-black tracking-[0.2em] uppercase mb-4 pl-4">{t("accountSecurity")}</h3>
             <div className="bg-white/80 dark:bg-slate-800/60 backdrop-blur-xl border border-slate-200 dark:border-slate-700/50 rounded-[32px] overflow-hidden shadow-lg transition-colors duration-300">
               <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
                 <div className="flex items-center gap-5">
                   <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
                     <Lock className="w-6 h-6" />
                   </div>
-                  <span className="font-bold text-lg text-slate-900 dark:text-white">Change Password</span>
+                  <span className="font-bold text-lg text-slate-900 dark:text-white">{t("changePassword")}</span>
                 </div>
                 <ChevronRight className="w-6 h-6 text-slate-400 dark:text-slate-500" />
               </div>
@@ -132,7 +140,7 @@ const Settings = () => {
                   <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400">
                     <ShieldCheck className="w-6 h-6" />
                   </div>
-                  <span className="font-bold text-lg text-slate-900 dark:text-white">Two-Factor Authentication</span>
+                  <span className="font-bold text-lg text-slate-900 dark:text-white">{t("twoFactor")}</span>
                 </div>
                 <div className={`w-14 h-7 rounded-full p-1 shadow-inner transition-colors duration-300 ${twoFactor ? 'bg-purple-500' : 'bg-slate-600'}`}>
                   <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-300 shadow-sm ${twoFactor ? 'translate-x-7' : 'translate-x-0'}`} />
@@ -143,7 +151,7 @@ const Settings = () => {
 
           {/* PREFERENCES */}
           <section>
-            <h3 className="text-xs text-slate-500 dark:text-slate-400 font-black tracking-[0.2em] uppercase mb-4 pl-4">Preferences</h3>
+            <h3 className="text-xs text-slate-500 dark:text-slate-400 font-black tracking-[0.2em] uppercase mb-4 pl-4">{t("preferences")}</h3>
             <div className="bg-white/80 dark:bg-slate-800/60 backdrop-blur-xl border border-slate-200 dark:border-slate-700/50 rounded-[32px] overflow-hidden shadow-lg transition-colors duration-300">
               <div className="flex items-center justify-between p-6 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
                 <div className="flex items-center gap-5">
@@ -159,7 +167,7 @@ const Settings = () => {
 
           {/* DANGER ZONE */}
           <section>
-            <h3 className="text-xs text-red-500 font-black tracking-[0.2em] uppercase mb-4 pl-4">Danger Zone</h3>
+            <h3 className="text-xs text-red-500 font-black tracking-[0.2em] uppercase mb-4 pl-4">{t("dangerZone")}</h3>
             <div className="bg-white/80 dark:bg-slate-800/60 backdrop-blur-xl border border-red-200 dark:border-red-900/30 rounded-[32px] overflow-hidden shadow-lg transition-colors duration-300">
               <div 
                 onClick={handleLogout}
@@ -169,7 +177,7 @@ const Settings = () => {
                   <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-600 dark:text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors">
                     <LogOut className="w-6 h-6" />
                   </div>
-                  <span className="font-bold text-lg text-red-600 dark:text-red-400 group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">Sign Out</span>
+                  <span className="font-bold text-lg text-red-600 dark:text-red-400 group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">{t("signOut")}</span>
                 </div>
               </div>
               
@@ -178,7 +186,7 @@ const Settings = () => {
                   <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-600 dark:text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors">
                     <Trash2 className="w-6 h-6" />
                   </div>
-                  <span className="font-bold text-lg text-red-600 dark:text-red-400 group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">Delete Account</span>
+                  <span className="font-bold text-lg text-red-600 dark:text-red-400 group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">{t("deleteAccount")}</span>
                 </div>
               </div>
             </div>

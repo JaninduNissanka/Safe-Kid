@@ -19,7 +19,9 @@ const Sidebar = () => {
 
   return (
     <div className="absolute left-6 top-6 bottom-6 w-24 bg-white/85 dark:bg-slate-800/80 backdrop-blur-2xl border border-white/50 dark:border-slate-700/50 rounded-[32px] flex flex-col items-center py-8 shadow-[0_8px_30px_rgba(0,0,0,0.12)] z-50 transition-colors duration-300">
-      <div className="mb-10 text-indigo-600 dark:text-indigo-400">
+      <div 
+        className="mb-10 text-indigo-600 dark:text-indigo-400 hover:scale-110 transition-transform"
+      >
         <ShieldCheck className="w-10 h-10" />
       </div>
 

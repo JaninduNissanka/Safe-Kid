@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class GuardianAlertsScreen extends StatefulWidget {
   final VoidCallback onOpenMap;
@@ -62,17 +64,16 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Open Live Map?"),
-        content:
-            const Text("Go to Home tab to view the child location on the map."),
+        title: Text("alerts.open_map_title".tr()),
+        content: Text("alerts.open_map_content".tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text("alerts.cancel".tr()),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Open"),
+            child: Text("alerts.open".tr()),
           ),
         ],
       ),
@@ -117,11 +118,11 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
       child: Row(
         children: [
-          chip("All", "all"),
+          chip("alerts.filter_all".tr(), "all"),
           const SizedBox(width: 8),
-          chip("Active", "active"),
+          chip("alerts.filter_active".tr(), "active"),
           const SizedBox(width: 8),
-          chip("Resolved", "resolved"),
+          chip("alerts.filter_resolved".tr(), "resolved"),
         ],
       ),
     );
@@ -130,11 +131,11 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Alerts")),
+      appBar: AppBar(title: Text("alerts.title".tr())),
       body: _pairingCode == "Loading..."
           ? const Center(child: CircularProgressIndicator())
           : _pairingCode == "No Code"
-              ? const Center(child: Text("No pairing code found."))
+              ? Center(child: Text("alerts.no_code".tr()))
               : Column(
                   children: [
                     _buildFilterBar(),
@@ -174,8 +175,8 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
                             return Center(
                               child: Text(
                                 _filter == "all"
-                                    ? "No alerts yet."
-                                    : "No ${_filter.toUpperCase()} alerts.",
+                                    ? "alerts.no_alerts".tr()
+                                    : "alerts.no_filter_alerts".tr(args: [_filter.toUpperCase()]),
                                 style: const TextStyle(color: Colors.grey),
                               ),
                             );
@@ -199,54 +200,78 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
                               final dynamic rawTime = data['createdAt'] ?? data['timestamp'];
                               final Timestamp? createdAt = rawTime is Timestamp ? rawTime : null;
 
-                              final bool isSos = type == 'SOS';
                               final bool isActive = status == 'active';
 
-                              final Color accent = isSos
-                                  ? (isActive ? Colors.red : Colors.grey)
-                                  : (isActive ? Colors.orange : Colors.grey);
+                              // --- SEVERITY STYLING LOGIC ---
+                              Color accent;
+                              IconData iconData;
+                              Color bgColor;
 
-                              final IconData icon = isSos
-                                  ? Icons.warning_rounded
-                                  : Icons.notifications;
+                              if (!isActive) {
+                                accent = Colors.blueGrey.shade400;
+                                iconData = PhosphorIcons.checkCircle();
+                                bgColor = Colors.blueGrey.shade50;
+                              } else if (type == 'SOS') {
+                                accent = Colors.red;
+                                iconData = PhosphorIcons.warningCircle(PhosphorIconsStyle.fill);
+                                bgColor = Colors.red.shade50;
+                              } else if (type == 'SPEED') {
+                                accent = Colors.orange;
+                                iconData = PhosphorIcons.gauge();
+                                bgColor = Colors.orange.shade50;
+                              } else {
+                                // Default for Zone or other active alerts
+                                accent = Colors.amber.shade700;
+                                iconData = PhosphorIcons.mapPin();
+                                bgColor = Colors.amber.shade50;
+                              }
 
                               return InkWell(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(16),
                                 onTap: _openMapDialog,
                                 child: Card(
-                                  elevation: 1,
+                                  elevation: 0,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(
+                                      color: isActive ? accent.withOpacity(0.2) : Colors.transparent,
+                                      width: 1,
+                                    ),
                                   ),
+                                  color: Theme.of(context).cardColor,
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 10),
+                                    padding: const EdgeInsets.all(12),
                                     child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
-                                        CircleAvatar(
-                                          backgroundColor:
-                                              accent.withOpacity(0.15),
-                                          child: Icon(icon, color: accent),
+                                        Container(
+                                          width: 52,
+                                          height: 52,
+                                          decoration: BoxDecoration(
+                                            color: bgColor,
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                          child: Icon(iconData, color: accent, size: 28),
                                         ),
-                                        const SizedBox(width: 12),
+                                        const SizedBox(width: 14),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                 children: [
                                                   Expanded(
                                                     child: Text(
                                                       title,
                                                       style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 16,
-                                                        color: isSos && isActive
-                                                            ? Colors.red
-                                                            : null,
+                                                        fontWeight: FontWeight.w900,
+                                                        fontSize: 15,
+                                                        color: !isActive ? Colors.blueGrey.shade400 : null,
                                                       ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                   _StatusChip(
@@ -254,19 +279,33 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
                                                       accent: accent),
                                                 ],
                                               ),
-                                              const SizedBox(height: 4),
-                                              Text(message,
-                                                  style: TextStyle(
-                                                      color: Theme.of(context).textTheme.bodyMedium?.color)),
-                                              const SizedBox(height: 6),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                message,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: !isActive 
+                                                      ? Colors.blueGrey.shade300 
+                                                      : Theme.of(context).textTheme.bodyMedium?.color,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
                                               Text(
                                                 _formatWhen(createdAt),
-                                                style: const TextStyle(
-                                                    color: Colors.grey,
-                                                    fontSize: 12),
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade500,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                               ),
                                             ],
                                           ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          PhosphorIcons.caretRight(),
+                                          size: 18,
+                                          color: Colors.grey.shade400,
                                         ),
                                       ],
                                     ),
@@ -293,18 +332,18 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color:
-            isActive ? accent.withOpacity(0.12) : Colors.grey.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20),
+        color: isActive ? accent.withOpacity(0.1) : Colors.blueGrey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        isActive ? "ACTIVE" : "RESOLVED",
+        isActive ? "alerts.status_active".tr() : "alerts.status_resolved".tr(),
         style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isActive ? accent : Colors.grey,
-          fontSize: 12,
+          fontWeight: FontWeight.w900,
+          color: isActive ? accent : Colors.blueGrey.shade400,
+          fontSize: 10,
+          letterSpacing: 0.5,
         ),
       ),
     );

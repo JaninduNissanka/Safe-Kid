@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { db, auth } from '../firebase';
 import { onSnapshot, doc, collection, query, deleteDoc } from 'firebase/firestore';
 import { Bell, AlertTriangle, ShieldCheck, Clock, Trash2 } from 'lucide-react';
 
 const Alerts = () => {
+  const { t } = useTranslation();
   const [pairingCode, setPairingCode] = useState(null);
   const [alerts, setAlerts] = useState([]);
 
@@ -36,7 +38,7 @@ const Alerts = () => {
   }, [pairingCode]);
 
   const handleDelete = async (alertId) => {
-    if (!window.confirm("Are you sure you want to remove this alert from history?")) return;
+    if (!window.confirm(t('deleteAlertConfirm'))) return;
     try {
       await deleteDoc(doc(db, 'alerts', pairingCode, 'items', alertId));
     } catch (err) {
@@ -63,13 +65,13 @@ const Alerts = () => {
     <div className="p-10 max-w-6xl mx-auto transition-colors duration-300">
       <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white transition-colors duration-300">Safety Alerts</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 transition-colors duration-300">Monitor all emergency and geofence events</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white transition-colors duration-300">{t('safetyAlerts')}</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 transition-colors duration-300">{t('monitorEvents')}</p>
         </div>
         <div className="flex gap-3">
           <div className="px-4 py-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/50 text-slate-900 dark:text-white text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors duration-300">
             <span className="w-3 h-3 bg-danger rounded-full animate-pulse" />
-            Live Monitoring
+            {t('liveMonitoring')}
           </div>
         </div>
       </div>
@@ -78,11 +80,11 @@ const Alerts = () => {
         <table className="w-full text-left">
           <thead>
             <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-700/50">
-              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Event</th>
-              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Alert Type</th>
-              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Time</th>
-              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Status</th>
-              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">Actions</th>
+              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('event')}</th>
+              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('alertType')}</th>
+              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('time')}</th>
+              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">{t('status')}</th>
+              <th className="px-8 py-5 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">{t('actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
@@ -118,7 +120,7 @@ const Alerts = () => {
                       ? 'bg-danger/10 text-danger animate-pulse' 
                       : 'bg-green-100 text-green-700'
                   }`}>
-                    {alert.status === 'active' ? 'ACTIVE' : 'RESOLVED'}
+                    {alert.status === 'active' ? t('active') : t('resolved')}
                   </span>
                 </td>
                 <td className="px-8 py-6 text-right">
@@ -138,7 +140,7 @@ const Alerts = () => {
                   <div className="w-20 h-20 bg-slate-50 dark:bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4 transition-colors duration-300">
                     <Bell className="text-slate-300 dark:text-slate-500 w-10 h-10" />
                   </div>
-                  <p className="text-slate-400 dark:text-slate-500 font-medium transition-colors">No safety alerts captured yet.</p>
+                  <p className="text-slate-400 dark:text-slate-500 font-medium transition-colors">{t('noAlerts')}</p>
                 </td>
               </tr>
             )}

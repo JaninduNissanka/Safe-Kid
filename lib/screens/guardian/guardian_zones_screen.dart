@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class GuardianZonesScreen extends StatefulWidget {
   const GuardianZonesScreen({super.key});
@@ -89,7 +91,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
       });
 
       await batch.commit();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🚀 Safe Zone Synced!")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("zones.synced".tr())));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
@@ -104,7 +106,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Manage Safe Zones")),
+      appBar: AppBar(title: Text("zones.title".tr())),
       body: Column(
         children: [
           Expanded(
@@ -113,7 +115,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("1. Set Perimeter (Auto-synced to Child)", style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text("zones.step_1".tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
                   Container(
                     height: 200,
@@ -142,10 +144,10 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("Radius: ${_radiusMeters.round()}m", style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color)),
+                      Text("zones.radius".tr(args: [_radiusMeters.round().toString()]), style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color)),
                       ElevatedButton(
                         onPressed: _saving ? null : _saveSafeZone,
-                        child: Text(_saving ? "Saving..." : "Apply Zone"),
+                        child: Text(_saving ? "zones.saving".tr() : "zones.apply_zone".tr()),
                       ),
                     ],
                   ),
@@ -155,7 +157,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                     onChanged: (v) => setState(() => _radiusMeters = v),
                   ),
                   const Divider(height: 40),
-                  const Text("2. History", style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text("zones.step_2".tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
                   _buildZonesList(),
                 ],
@@ -174,7 +176,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox();
         final docs = snapshot.data!.docs;
-        if (docs.isEmpty) return const Text("No zones saved.", style: TextStyle(color: Colors.grey));
+        if (docs.isEmpty) return Text("zones.no_zones".tr(), style: const TextStyle(color: Colors.grey));
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -185,7 +187,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
             return Card(
               child: ListTile(
                 leading: Icon(Icons.location_on, color: isActive ? Colors.green : Colors.grey),
-                title: Text("${z['radiusMeters']}m Perimeter"),
+                title: Text("zones.perimeter".tr(args: [z['radiusMeters'].toString()])),
                 trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteZone(docs[i].id)),
               ),
             );

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Mail, Lock, AlertCircle } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { ShieldCheck, Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -88,7 +88,18 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6 relative">
+      {/* 🧭 BACK TO HOME LOGO */}
+      <Link 
+        to="/" 
+        className="absolute top-8 left-6 md:left-12 flex items-center gap-3 group cursor-pointer"
+      >
+        <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm group-hover:border-primary/50 group-hover:-translate-x-1 transition-all">
+          <ArrowLeft className="text-slate-500 w-5 h-5 group-hover:text-primary transition-colors" />
+        </div>
+        <span className="text-xl font-black tracking-tighter text-slate-900 hidden sm:block group-hover:text-primary transition-colors">SAFE<span className="text-primary">KID</span></span>
+      </Link>
+
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/10 rounded-3xl mb-4">

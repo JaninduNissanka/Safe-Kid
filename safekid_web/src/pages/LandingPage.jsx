@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { 
   ShieldCheck, Map, Bell, Smartphone, ArrowRight, 
   CheckCircle, Zap, Globe, Lock, Play, Menu, X,
-  Heart, Users, Star
+  Heart, Users, Star, Battery, UserPlus, Link as LinkIcon, CheckCircle2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -11,22 +11,25 @@ const LandingPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
-    <div className="min-h-screen bg-mesh selection:bg-primary/30">
+    <div id="top" className="min-h-screen bg-mesh selection:bg-primary/30 scroll-mt-20">
       {/* 🧭 NAVIGATION */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'glass py-3 shadow-sm' : 'py-6'}`}>
         <div className="container mx-auto px-6 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 group">
+          <a 
+            href="#top" 
+            className="flex items-center gap-2 group"
+          >
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform">
               <ShieldCheck className="text-white w-6 h-6" />
             </div>
             <span className="text-2xl font-black tracking-tighter text-slate-900">SAFE<span className="text-primary">KID</span></span>
-          </Link>
+          </a>
 
           <div className="hidden md:flex items-center gap-10">
             <NavLink href="#features">Features</NavLink>
@@ -144,29 +147,143 @@ const LandingPage = () => {
               <span className="text-primary italic">It's a promise.</span>
             </h2>
             <p className="text-slate-500 text-lg">
-              We built SafeKid with military-grade encryption and aerospace-level tracking accuracy.
+              We built SafeKid focusing on core essentials. No bloatware, no distractions.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             <FeatureCard 
               icon={Map} 
               color="bg-primary/10 text-primary"
-              title="Real-time Radar" 
-              desc="Military-grade GPS tracking that updates every 5 seconds. Know exactly where they are, always." 
+              title="Real-Time Tracking" 
+              desc="Pinpoint location accuracy using advanced GPS. Know exactly where they are, always." 
             />
             <FeatureCard 
               icon={ShieldCheck} 
               color="bg-secondary/10 text-secondary"
-              title="Smart Perimeters" 
-              desc="Set as many safe zones as you like. We'll alert you the second they cross a boundary." 
+              title="Intelligent Safe Zones" 
+              desc="Get instant alerts when they enter or leave school, home, or any custom perimeter." 
             />
             <FeatureCard 
               icon={Bell} 
               color="bg-accent/10 text-accent"
-              title="Hyper-Alert SOS" 
-              desc="Crisis alerts that bypass silent mode, Do Not Disturb, and maximize speaker volume." 
+              title="SOS Panic Alerts" 
+              desc="Critical emergency alerts that bypass silent mode on the Guardian's phone." 
             />
+            <FeatureCard 
+              icon={Battery} 
+              color="bg-emerald-500/10 text-emerald-500"
+              title="Battery Monitoring" 
+              desc="Always know their battery percentage. Get notified before their phone dies." 
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* 🚀 HOW IT WORKS SECTION */}
+      <section id="how-it-works" className="py-24 bg-white relative overflow-hidden border-y border-slate-100">
+        <div className="container mx-auto px-6 relative z-10">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 tracking-tight">
+              3 steps to complete <br/>
+              <span className="text-gradient">Peace of Mind.</span>
+            </h2>
+            <p className="text-slate-500 text-lg">
+              Contextual onboarding designed for busy parents. Setup takes less than 3 minutes.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-12 relative">
+            <div className="hidden md:block absolute top-16 left-[20%] right-[20%] h-1 bg-slate-100 -z-10"></div>
+            
+            <StepCard 
+              number="01"
+              icon={UserPlus}
+              title="Guardian Setup"
+              desc="Create your secure account on the web dashboard or mobile app to act as the command center."
+            />
+            <StepCard 
+              number="02"
+              icon={LinkIcon}
+              title="Connect Child Device"
+              desc="Install SafeKid on their phone and enter your unique 6-digit pairing code to link devices."
+            />
+            <StepCard 
+              number="03"
+              icon={Heart}
+              title="Peace of Mind"
+              desc="Start monitoring their location, battery status, and zone transitions instantly."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* 💰 PRICING SECTION */}
+      <section id="pricing" className="py-24 md:py-32 bg-slate-50 relative overflow-hidden">
+        <div className="container mx-auto px-6 relative z-10">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 tracking-tight">
+              Simple, transparent <br/>
+              <span className="text-primary italic">Pricing.</span>
+            </h2>
+            <p className="text-slate-500 text-lg">
+              Start for free, upgrade when your family grows. Cancel anytime.
+            </p>
+          </div>
+
+          <div className="flex flex-col md:flex-row justify-center items-center gap-8 md:gap-12 max-w-5xl mx-auto">
+            {/* Basic Tier */}
+            <div className="w-full md:w-1/2 max-w-md p-10 bg-white rounded-[40px] shadow-xl shadow-slate-200/50 border border-slate-100 transition-transform hover:-translate-y-2">
+              <h3 className="text-2xl font-black text-slate-900 mb-2">Basic</h3>
+              <div className="mb-6">
+                <span className="text-5xl font-black text-slate-900">$0</span>
+                <span className="text-slate-500 font-bold">/forever</span>
+              </div>
+              <p className="text-slate-500 font-medium mb-8">Perfect for single-child families who need basic location tracking.</p>
+              
+              <div className="space-y-4 mb-10">
+                <PricingFeature text="1 Child device" />
+                <PricingFeature text="Standard location updates" />
+                <PricingFeature text="1 Safe Zone perimeter" />
+                <PricingFeature text="Standard email support" />
+              </div>
+              
+              <Link 
+                to="/login"
+                className="block w-full py-4 text-center font-black rounded-2xl bg-slate-100 text-slate-900 hover:bg-slate-200 transition-colors"
+              >
+                Get Started Free
+              </Link>
+            </div>
+
+            {/* Pro Tier */}
+            <div className="w-full md:w-1/2 max-w-md p-10 bg-slate-900 rounded-[40px] shadow-2xl shadow-primary/30 border-2 border-primary relative transition-transform hover:-translate-y-2">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1.5 bg-primary text-white text-xs font-black uppercase tracking-widest rounded-full shadow-lg">
+                Most Popular
+              </div>
+              
+              <h3 className="text-2xl font-black text-white mb-2">Pro Family</h3>
+              <div className="mb-6">
+                <span className="text-5xl font-black text-white">$4.99</span>
+                <span className="text-slate-400 font-bold">/mo</span>
+              </div>
+              <p className="text-slate-300 font-medium mb-8">Advanced tools and priority alerts for maximum peace of mind.</p>
+              
+              <div className="space-y-4 mb-10">
+                <PricingFeature text="Up to 3 Child devices" dark />
+                <PricingFeature text="Instant SOS bypass alerts" dark />
+                <PricingFeature text="Unlimited Safe Zones" dark />
+                <PricingFeature text="Premium zone routing" dark />
+                <PricingFeature text="24/7 Priority support" dark />
+              </div>
+              
+              <Link 
+                to="/login"
+                className="block w-full py-4 text-center font-black rounded-2xl bg-primary text-white hover:bg-primary-dark transition-all shadow-[0_0_20px_rgba(88,101,242,0.4)]"
+              >
+                Start Pro Trial
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -232,10 +349,13 @@ const LandingPage = () => {
       <footer className="bg-white pt-20 pb-12 border-t border-slate-100">
         <div className="container mx-auto px-6 grid md:grid-cols-4 gap-12 mb-20 text-center md:text-left">
           <div className="col-span-2 md:col-span-1">
-             <Link to="/" className="flex items-center gap-2 mb-6 justify-center md:justify-start">
+             <a 
+              href="#top" 
+              className="flex items-center gap-2 mb-6 justify-center md:justify-start"
+             >
               <ShieldCheck className="text-primary w-8 h-8" />
               <span className="text-2xl font-black tracking-tighter">SAFEKID</span>
-            </Link>
+            </a>
             <p className="text-slate-500 mb-6">
               The world's most advanced child safety application. Designed with love and built with power.
             </p>
@@ -329,6 +449,26 @@ const FooterLink = ({ children }) => (
   <span className="hover:text-primary cursor-pointer transition-colors">
     {children}
   </span>
+);
+
+const StepCard = ({ number, icon: Icon, title, desc }) => (
+  <div className="flex flex-col items-center text-center relative z-10 group">
+    <div className="w-24 h-24 bg-white rounded-[32px] shadow-xl shadow-slate-200 border-2 border-slate-50 flex items-center justify-center mb-8 relative group-hover:-translate-y-2 transition-transform duration-300">
+      <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-xs shadow-lg">
+        {number}
+      </div>
+      <Icon className="w-10 h-10 text-primary" />
+    </div>
+    <h3 className="text-xl font-black text-slate-900 mb-4">{title}</h3>
+    <p className="text-slate-500 font-medium leading-relaxed max-w-xs">{desc}</p>
+  </div>
+);
+
+const PricingFeature = ({ text, dark }) => (
+  <div className="flex items-center gap-3">
+    <CheckCircle2 className={`w-5 h-5 ${dark ? 'text-primary' : 'text-primary'}`} />
+    <span className={`font-bold ${dark ? 'text-slate-200' : 'text-slate-700'}`}>{text}</span>
+  </div>
 );
 
 export default LandingPage;

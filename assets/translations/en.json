@@ -1,0 +1,68 @@
+{
+  "profile": {
+    "title": "My Profile",
+    "account_security": "Account Security",
+    "change_password": "Change Password",
+    "two_factor": "Two-Factor Authentication",
+    "preferences": "Preferences",
+    "notification_settings": "Notification Settings",
+    "danger_zone": "Danger Zone",
+    "sign_out": "Sign Out",
+    "delete_account": "Delete Account"
+  },
+  "navigation": {
+    "home": "Home",
+    "alerts": "Alerts",
+    "zones": "Zones",
+    "rules": "Rules",
+    "profile": "Profile"
+  },
+  "dashboard": {
+    "title": "SafeKid Guardian",
+    "perfectly_safe": "Perfectly Safe",
+    "outside_safe_zone": "OUTSIDE SAFE ZONE",
+    "battery": "BATTERY",
+    "online": "ONLINE",
+    "offline": "OFFLINE",
+    "inside": "INSIDE",
+    "breach": "BREACH",
+    "sos_title": "🚨 SOS ALERT!",
+    "sos_message": "Your child needs immediate assistance!",
+    "resolve": "RESOLVE",
+    "copied": "📋 Code {code} copied!\nEnter this code on your child's device to link their location."
+  },
+  "alerts": {
+    "title": "Alerts",
+    "filter_all": "All",
+    "filter_active": "Active",
+    "filter_resolved": "Resolved",
+    "no_code": "No pairing code found.",
+    "no_alerts": "No alerts yet.",
+    "no_filter_alerts": "No {} alerts.",
+    "status_active": "ACTIVE",
+    "status_resolved": "RESOLVED",
+    "open_map_title": "Open Live Map?",
+    "open_map_content": "Go to Home tab to view the child location on the map.",
+    "cancel": "Cancel",
+    "open": "Open"
+  },
+  "zones": {
+    "title": "Manage Safe Zones",
+    "step_1": "1. Set Perimeter (Auto-synced to Child)",
+    "step_2": "2. History",
+    "radius": "Radius: {}m",
+    "apply_zone": "Apply Zone",
+    "saving": "Saving...",
+    "synced": "🚀 Safe Zone Synced!",
+    "no_zones": "No zones saved.",
+    "perimeter": "{}m Perimeter"
+  },
+  "rules": {
+    "title": "Parental Rules",
+    "speed_title": "Speed & Telemetry",
+    "speed_desc": "Set a threshold to receive instant alerts if the child exceeds a safe speed (e.g. they enter a vehicle).",
+    "limit_threshold": "Limit Threshold",
+    "updated": "🚀 Speed Limit Updated!",
+    "info": "To avoid false alarms (GPS bounce), the system only triggers an alert after 3 consecutive readings above the limit."
+  }
+}

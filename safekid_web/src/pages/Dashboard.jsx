@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GoogleMap, useJsApiLoader, OverlayView, Circle } from '@react-google-maps/api';
 import { db, auth } from '../firebase';
 import { doc, onSnapshot, collection, query, orderBy, where } from 'firebase/firestore';
 import { Smartphone, Signal, Battery, Crosshair, Loader2, Shield, Map as MapIcon, CheckCircle2, AlertCircle, Activity, BellRing } from 'lucide-react';
 
 const Dashboard = () => {
+  const { t } = useTranslation();
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: "AIzaSyAPzTmlDUga-B7olx8p9-ai2BbRNl6v4S4"
@@ -107,7 +109,7 @@ const Dashboard = () => {
                   👦
                 </div>
                 <div className={`px-4 py-1 rounded-full mt-1 shadow-md border-2 border-white ${isActuallyOutside ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
-                  <span className="text-[10px] font-black uppercase tracking-widest">{childData.name || "Child"}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">{childData.name || t('childPlaceholder')}</span>
                 </div>
               </div>
             </OverlayView>
@@ -139,9 +141,9 @@ const Dashboard = () => {
               {isSafe ? <CheckCircle2 className="w-7 h-7" /> : <AlertCircle className="w-7 h-7" />}
             </div>
             <div>
-              <h2 className="font-black text-xl text-slate-900 dark:text-white tracking-tight leading-none mb-1">{childData?.name || 'Monitoring...'}</h2>
+              <h2 className="font-black text-xl text-slate-900 dark:text-white tracking-tight leading-none mb-1">{childData?.name || t('monitoring')}</h2>
               <p className={`text-[10px] font-black uppercase tracking-[0.15em] mb-3 ${isSafe ? 'text-green-600' : 'text-red-600'}`}>
-                {isSafe ? 'Perfectly Safe' : 'Outside Safe Zone'}
+                {isSafe ? t('perfectlySafe') : t('outsideSafeZone')}
               </p>
               
               {/* COMPACT PILLS */}
@@ -152,7 +154,7 @@ const Dashboard = () => {
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700/50 transition-colors duration-300">
                   <Signal className={`w-3.5 h-3.5 ${isSafe ? 'text-indigo-500' : 'text-red-500'}`} />
-                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{childData?.isOnline ? 'Strong' : 'Offline'}</span>
+                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{childData?.isOnline ? t('strong') : t('offline')}</span>
                 </div>
               </div>
             </div>
@@ -163,7 +165,7 @@ const Dashboard = () => {
         <section>
           <div className="flex items-center gap-2 mb-4 px-2">
             <Shield className="w-4 h-4 text-slate-400" />
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Safety Perimeter Settings</h3>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('safetyPerimeterSettings')}</h3>
           </div>
           
           <div className="space-y-3">
@@ -175,9 +177,9 @@ const Dashboard = () => {
                       <MapIcon className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-200">{z.radiusMeters}m Zone</p>
+                      <p className="text-sm font-black text-slate-800 dark:text-slate-200">{t('zoneRadius', { radius: z.radiusMeters })}</p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                        {z.isActive ? 'Actively Monitoring' : 'Inactive'}
+                        {z.isActive ? t('activelyMonitoring') : t('inactive')}
                       </p>
                     </div>
                   </div>
@@ -194,14 +196,14 @@ const Dashboard = () => {
             <div className="w-12 h-12 rounded-[18px] bg-slate-50 dark:bg-slate-900 flex items-center justify-center mb-3 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/20 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 text-slate-400 transition-colors shadow-inner">
               <Smartphone className="w-6 h-6" />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Ping Device</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{t('pingDevice')}</span>
           </button>
           
           <button className="flex flex-col items-center justify-center p-5 rounded-[28px] bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-slate-700 transition-all border border-slate-100 dark:border-slate-700/50 shadow-sm group">
             <div className="w-12 h-12 rounded-[18px] bg-slate-50 dark:bg-slate-900 flex items-center justify-center mb-3 group-hover:bg-red-100 dark:group-hover:bg-red-500/20 group-hover:text-red-600 dark:group-hover:text-red-400 text-slate-400 transition-colors shadow-inner">
               <BellRing className="w-6 h-6" />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">Sound Alarm</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">{t('soundAlarm')}</span>
           </button>
         </section>
 
@@ -209,7 +211,7 @@ const Dashboard = () => {
         <section className="mt-auto">
           <div className="flex items-center gap-2 mb-4 px-2">
             <Activity className="w-4 h-4 text-slate-400" />
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Live Telemetry</h3>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('liveTelemetry')}</h3>
           </div>
           
           <div className="p-6 rounded-[28px] border border-slate-100 dark:border-slate-700/50 bg-slate-50/80 dark:bg-slate-800/80 transition-colors duration-300">
@@ -219,7 +221,7 @@ const Dashboard = () => {
                     <div key={alert.id} className="flex items-start gap-3">
                        <div className="w-2.5 h-2.5 rounded-full bg-red-500 mt-1 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse" />
                        <div>
-                         <p className="text-sm font-black text-slate-800 dark:text-slate-200 leading-tight">Security Alert Triggered</p>
+                         <p className="text-sm font-black text-slate-800 dark:text-slate-200 leading-tight">{t('securityAlertTriggered')}</p>
                          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{alert.type || 'GEOFENCE BREACH'}</p>
                        </div>
                     </div>
@@ -230,8 +232,8 @@ const Dashboard = () => {
                 <div className="w-12 h-12 rounded-full bg-green-50 dark:bg-green-500/10 flex items-center justify-center mb-3">
                   <CheckCircle2 className="w-6 h-6 text-green-500 dark:text-green-400" />
                 </div>
-                <p className="text-xs font-black text-slate-700 dark:text-slate-300">All Systems Operational</p>
-                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-wider">No Active Threats</p>
+                <p className="text-xs font-black text-slate-700 dark:text-slate-300">{t('allSystemsOperational')}</p>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-wider">{t('noActiveThreats')}</p>
               </div>
             )}
           </div>
@@ -243,7 +245,7 @@ const Dashboard = () => {
         onClick={centerOnChild}
         className="absolute bottom-10 right-10 z-10 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-6 py-4 rounded-full font-black text-xs uppercase tracking-[0.15em] hover:bg-indigo-50 dark:hover:bg-slate-700 transition-all flex items-center gap-3 shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-slate-100 dark:border-slate-700/50 active:scale-95"
       >
-        <Crosshair className="w-5 h-5 text-indigo-600" /> Snap to Location
+        <Crosshair className="w-5 h-5 text-indigo-600" /> {t('snapToLocation')}
       </button>
 
     </div>

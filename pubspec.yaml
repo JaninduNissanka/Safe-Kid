@@ -26,6 +26,8 @@ dependencies:
   flutter_background_service: ^5.0.0
 
   # --- UTILITIES ---
+  easy_localization: ^3.0.3
+  phosphor_flutter: ^2.0.0
   cupertino_icons: ^1.0.6
   flutter_local_notifications: ^17.1.2
   firebase_messaging: ^15.1.3
@@ -40,6 +42,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   
-  # Ensure your images folder exists if you use custom markers/icons
-  # assets:
-  #   - assets/images/
+  assets:
+    - assets/translations/

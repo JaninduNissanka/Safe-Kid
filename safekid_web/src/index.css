@@ -11,6 +11,10 @@
   --accent: #FF4757; 
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: 'Outfit', sans-serif;
   @apply bg-slate-50 text-slate-900 antialiased;
@@ -18,7 +22,7 @@ body {
 
 @layer utilities {
   .glass {
-    @apply bg-white/80 backdrop-blur-xl border border-white/40;
+    @apply bg-white/95 backdrop-blur-2xl border-b border-slate-100 shadow-sm;
   }
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-gradient;
