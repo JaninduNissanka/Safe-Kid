@@ -9,7 +9,7 @@ const Dashboard = () => {
   const { t } = useTranslation();
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: "AIzaSyAPzTmlDUga-B7olx8p9-ai2BbRNl6v4S4"
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   });
 
   const [pairingCode, setPairingCode] = useState(null);
