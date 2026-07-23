@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 class MockAuthGate extends StatelessWidget {
   final Stream<String?> mockAuthStream;
 
-  const MockAuthGate({Key? key, required this.mockAuthStream}) : super(key: key);
+  const MockAuthGate({super.key, required this.mockAuthStream});
 
   @override
   Widget build(BuildContext context) {

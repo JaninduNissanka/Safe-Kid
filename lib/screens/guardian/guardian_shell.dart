@@ -108,10 +108,10 @@ class _GuardianShellState extends State<GuardianShell> {
         icon,
         if (count > 0)
           Positioned(
-            right: -8,
-            top: -6,
+            right: -4,
+            top: -4,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
                 color: Colors.red,
                 borderRadius: BorderRadius.circular(999),
@@ -120,13 +120,34 @@ class _GuardianShellState extends State<GuardianShell> {
                 count > 99 ? "99+" : "$count",
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 11,
+                  fontSize: 9,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildIcon(IconData icon, {bool isActive = false, int count = 0}) {
+    final Widget iconWidget = Icon(
+      icon, 
+      size: 22,
+    );
+    
+    final Widget badgeOrIcon = count > 0 
+        ? _badgeIcon(icon: iconWidget, count: count) 
+        : iconWidget;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: isActive ? const Color(0xFF5865F2).withOpacity(0.12) : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: badgeOrIcon,
     );
   }
 
@@ -174,34 +195,28 @@ class _GuardianShellState extends State<GuardianShell> {
           ),
           items: [
             BottomNavigationBarItem(
-              icon: Icon(PhosphorIcons.house()),
-              activeIcon: Icon(PhosphorIcons.house(PhosphorIconsStyle.fill)),
+              icon: _buildIcon(PhosphorIcons.house()),
+              activeIcon: _buildIcon(PhosphorIcons.house(PhosphorIconsStyle.fill), isActive: true),
               label: "navigation.home".tr(),
             ),
             BottomNavigationBarItem(
-              icon: _badgeIcon(
-                icon: Icon(PhosphorIcons.bell()),
-                count: _activeAlertsCount,
-              ),
-              activeIcon: _badgeIcon(
-                icon: Icon(PhosphorIcons.bell(PhosphorIconsStyle.fill)),
-                count: _activeAlertsCount,
-              ),
+              icon: _buildIcon(PhosphorIcons.bell(), count: _activeAlertsCount),
+              activeIcon: _buildIcon(PhosphorIcons.bell(PhosphorIconsStyle.fill), isActive: true, count: _activeAlertsCount),
               label: "navigation.alerts".tr(),
             ),
             BottomNavigationBarItem(
-              icon: Icon(PhosphorIcons.crosshair()),
-              activeIcon: Icon(PhosphorIcons.crosshair(PhosphorIconsStyle.fill)),
+              icon: _buildIcon(PhosphorIcons.crosshair()),
+              activeIcon: _buildIcon(PhosphorIcons.crosshair(PhosphorIconsStyle.fill), isActive: true),
               label: "navigation.zones".tr(),
             ),
             BottomNavigationBarItem(
-              icon: Icon(PhosphorIcons.slidersHorizontal()),
-              activeIcon: Icon(PhosphorIcons.slidersHorizontal(PhosphorIconsStyle.fill)),
+              icon: _buildIcon(PhosphorIcons.slidersHorizontal()),
+              activeIcon: _buildIcon(PhosphorIcons.slidersHorizontal(PhosphorIconsStyle.fill), isActive: true),
               label: "navigation.rules".tr(),
             ),
             BottomNavigationBarItem(
-              icon: Icon(PhosphorIcons.user()),
-              activeIcon: Icon(PhosphorIcons.user(PhosphorIconsStyle.fill)),
+              icon: _buildIcon(PhosphorIcons.user()),
+              activeIcon: _buildIcon(PhosphorIcons.user(PhosphorIconsStyle.fill), isActive: true),
               label: "navigation.profile".tr(),
             ),
           ],

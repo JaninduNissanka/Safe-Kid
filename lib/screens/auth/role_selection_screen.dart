@@ -1,88 +1,70 @@
 import 'package:flutter/material.dart';
-
-// ✅ Add these imports (make sure the paths match your folder)
 import 'guardian_login_screen.dart';
 import 'child_login_screen.dart';
+import '../../widgets/safekid_logo.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      // 1. Premium Subtle Background Gradient
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF4F7FF),
-              Colors.white,
-            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark 
+              ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
+              : [const Color(0xFFF0F6FF), const Color(0xFFFFFFFF)],
           ),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Spacer(flex: 2),
+                const Spacer(flex: 3),
 
-                // 2. Upgraded Logo with Soft Glow
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.15),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.admin_panel_settings_rounded,
-                    size: 60,
-                    color: Colors.blueAccent,
-                  ),
+                // Premium Custom SafeKidLogo Silhouette
+                const Center(
+                  child: SafeKidCartoonLogo(size: 190),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 36),
 
-                // 3. Premium Typography
-                const Text(
+                // Title and taglines
+                Text(
                   "SafeKid",
                   style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1E293B),
-                    letterSpacing: -0.5,
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    letterSpacing: -0.8,
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Text(
+                const SizedBox(height: 8),
+                Text(
                   "Choose your role to continue",
                   style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.blueGrey.shade300 : const Color(0xFF64748B),
                   ),
                 ),
 
                 const Spacer(flex: 2),
 
-                // 4. Modern Interactive Cards
+                // Interactive Modern Role Panels
                 _buildRoleCard(
                   context: context,
                   title: "I am a PARENT",
-                  subtitle: "Monitor my child's location",
+                  subtitle: "Monitor location, rules, alerts & limits",
                   icon: Icons.family_restroom_rounded,
-                  accentColor: Colors.blueAccent,
+                  accentColor: const Color(0xFF1D4ED8), // Royal Blue
                   onTap: () {
-                    // ✅ Navigate to Guardian Login
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -92,16 +74,15 @@ class RoleSelectionScreen extends StatelessWidget {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
                 _buildRoleCard(
                   context: context,
                   title: "I am a CHILD",
-                  subtitle: "Connect to my parents",
+                  subtitle: "Pair phone, send SOS alerts & sync location",
                   icon: Icons.child_care_rounded,
-                  accentColor: Colors.orangeAccent,
+                  accentColor: const Color(0xFFEA580C), // Playful Orange
                   onTap: () {
-                    // ✅ Navigate to Child Login
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -111,7 +92,7 @@ class RoleSelectionScreen extends StatelessWidget {
                   },
                 ),
 
-                const Spacer(flex: 3),
+                const Spacer(flex: 4),
               ],
             ),
           ),
@@ -120,7 +101,6 @@ class RoleSelectionScreen extends StatelessWidget {
     );
   }
 
-  // Helper method to create premium looking cards
   Widget _buildRoleCard({
     required BuildContext context,
     required String title,
@@ -129,63 +109,80 @@ class RoleSelectionScreen extends StatelessWidget {
     required Color accentColor,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: accentColor.withOpacity(0.1), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: accentColor.withOpacity(0.08),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.15),
+          width: 2.0,
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon, size: 32, color: accentColor),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: accentColor,
-                      letterSpacing: 0.5,
-                    ),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(26),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 22.0),
+            child: Row(
+              children: [
+                // Circular icon frame
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF64748B),
-                    ),
+                  child: Icon(icon, size: 32, color: accentColor),
+                ),
+                const SizedBox(width: 18),
+                
+                // Card details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: accentColor,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.blueGrey.shade200 : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                
+                // Chevron end indicator
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: accentColor.withValues(alpha: 0.6),
+                  size: 26,
+                ),
+              ],
             ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              color: accentColor.withOpacity(0.5),
-              size: 20,
-            ),
-          ],
+          ),
         ),
       ),
     );

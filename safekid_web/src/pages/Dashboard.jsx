@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { GoogleMap, useJsApiLoader, OverlayView, Circle } from '@react-google-maps/api';
 import { db, auth } from '../firebase';
 import { doc, onSnapshot, collection, query, orderBy, where } from 'firebase/firestore';
-import { Smartphone, Signal, Battery, Crosshair, Loader2, Shield, Map as MapIcon, CheckCircle2, AlertCircle, Activity, BellRing } from 'lucide-react';
+import { Smartphone, Signal, Battery, BatteryCharging, Wifi, WifiOff, Crosshair, Loader2, Shield, Map as MapIcon, CheckCircle2, AlertCircle, Activity, BellRing } from 'lucide-react';
 
 const Dashboard = () => {
   const { t } = useTranslation();
@@ -13,11 +13,14 @@ const Dashboard = () => {
   });
 
   const [pairingCode, setPairingCode] = useState(null);
+  const [devices, setDevices] = useState([]);
+  const [selectedChildId, setSelectedChildId] = useState(null);
   const [childData, setChildData] = useState(null);
   const [zones, setZones] = useState([]);
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [map, setMap] = useState(null);
   const [isInsideLocal, setIsInsideLocal] = useState(true);
+  const [timelineEvents, setTimelineEvents] = useState([]);
 
   // 1. Fetch User Pairing Code
   useEffect(() => {
@@ -33,11 +36,20 @@ const Dashboard = () => {
   useEffect(() => {
     if (!pairingCode) return;
 
-    const unsubLoc = onSnapshot(doc(db, 'locations', pairingCode), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setChildData({ ...data, latitude: Number(data.latitude), longitude: Number(data.longitude) });
-      }
+    const unsubLoc = onSnapshot(collection(db, 'locations', pairingCode, 'devices'), (snap) => {
+      const devicesList = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          latitude: Number(data.latitude),
+          longitude: Number(data.longitude),
+          battery: Number(data.battery) || 0,
+          batteryStatus: data.batteryStatus || 'unknown',
+          connectionType: data.connectionType || 'unknown',
+        };
+      });
+      setDevices(devicesList);
     });
 
     const unsubZones = onSnapshot(query(collection(db, 'zones', pairingCode, 'items'), orderBy('createdAt', 'desc')), (snap) => {
@@ -50,6 +62,49 @@ const Dashboard = () => {
 
     return () => { unsubLoc(); unsubZones(); unsubAlerts(); };
   }, [pairingCode]);
+
+  // Sync selected child data
+  useEffect(() => {
+    if (devices.length === 0) {
+      setChildData(null);
+      return;
+    }
+    let selectedId = selectedChildId;
+    if (!selectedId || !devices.find(d => d.id === selectedId)) {
+      selectedId = devices[0].id;
+      setSelectedChildId(selectedId);
+    }
+    const activeChild = devices.find(d => d.id === selectedId);
+    if (activeChild) {
+      setChildData(activeChild);
+    }
+  }, [devices, selectedChildId]);
+
+  // 3. Fetch Timeline Events
+  useEffect(() => {
+    if (!pairingCode || !selectedChildId) return;
+
+    const todayDateStr = (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+
+    const q = query(
+      collection(db, 'locations', pairingCode, 'devices', selectedChildId, 'timeline'),
+      where('dateStr', '==', todayDateStr),
+      orderBy('timestamp', 'asc')
+    );
+
+    const unsubTimeline = onSnapshot(q, (snap) => {
+      setTimelineEvents(snap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate()
+      })));
+    });
+
+    return () => unsubTimeline();
+  }, [pairingCode, selectedChildId]);
 
   // SMART SAFETY CHECK: Local distance verification
   useEffect(() => {
@@ -78,6 +133,11 @@ const Dashboard = () => {
     if (map && childData) map.panTo({ lat: childData.latitude, lng: childData.longitude });
   };
 
+  const formatTime = (date) => {
+    if (!date) return '--:--';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   if (!isLoaded) return <div className="h-screen bg-slate-900 text-white flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   const isActuallyOutside = activeAlerts.length > 0 && !isInsideLocal;
@@ -95,25 +155,45 @@ const Dashboard = () => {
           onLoad={m => setMap(m)}
           options={{ disableDefaultUI: false, mapId: "f40e06059d33261a" }}
         >
-          {childData && (
-            <OverlayView
-              position={{ lat: childData.latitude, lng: childData.longitude }}
-              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-              getPixelPositionOffset={(width, height) => ({
-                x: -(width / 2),
-                y: -height,
-              })}
-            >
-              <div className="flex flex-col items-center cursor-pointer hover:scale-110 transition-transform origin-bottom drop-shadow-2xl">
-                <div className={`w-14 h-14 rounded-full border-4 border-white shadow-lg flex items-center justify-center text-2xl ${isActuallyOutside ? 'bg-red-500' : 'bg-blue-500'}`}>
-                  👦
+          {devices.map(child => {
+            const isChildSelected = child.id === selectedChildId;
+            const activeZone = zones.find(z => z.isActive);
+            const dist = activeZone 
+              ? calculateDistance(child.latitude, child.longitude, Number(activeZone.centerLat), Number(activeZone.centerLng))
+              : 0;
+            const childIsOutside = activeZone && dist > Number(activeZone.radiusMeters);
+            const isChildSosActive = child.isSosActive;
+
+            const markerBgColor = isChildSosActive 
+              ? 'bg-red-600 animate-bounce' 
+              : childIsOutside 
+                ? 'bg-orange-500' 
+                : 'bg-blue-500';
+
+            return (
+              <OverlayView
+                key={child.id}
+                position={{ lat: child.latitude, lng: child.longitude }}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                getPixelPositionOffset={(width, height) => ({
+                  x: -(width / 2),
+                  y: -height,
+                })}
+              >
+                <div 
+                  onClick={() => setSelectedChildId(child.id)}
+                  className={`flex flex-col items-center cursor-pointer hover:scale-110 transition-transform origin-bottom drop-shadow-2xl ${isChildSelected ? 'scale-105 z-10' : 'opacity-80'}`}
+                >
+                  <div className={`w-14 h-14 rounded-full border-4 ${isChildSelected ? 'border-indigo-400' : 'border-white'} shadow-lg flex items-center justify-center text-2xl ${markerBgColor}`}>
+                    👦
+                  </div>
+                  <div className={`px-4 py-1 rounded-full mt-1 shadow-md border-2 border-white ${isChildSosActive ? 'bg-red-600 text-white' : childIsOutside ? 'bg-orange-500 text-white' : 'bg-blue-500 text-white'}`}>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{child.name}</span>
+                  </div>
                 </div>
-                <div className={`px-4 py-1 rounded-full mt-1 shadow-md border-2 border-white ${isActuallyOutside ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
-                  <span className="text-[10px] font-black uppercase tracking-widest">{childData.name || t('childPlaceholder')}</span>
-                </div>
-              </div>
-            </OverlayView>
-          )}
+              </OverlayView>
+            );
+          })}
 
           {zones.map(z => (
             <Circle 
@@ -134,6 +214,43 @@ const Dashboard = () => {
       {/* FLOATING COMMAND PANEL (Glassmorphism) */}
       <div className="absolute top-6 bottom-6 left-36 w-[400px] bg-white/85 dark:bg-slate-800/85 backdrop-blur-2xl border border-white/50 dark:border-slate-700/50 p-8 flex flex-col gap-8 shadow-[0_8px_40px_rgba(0,0,0,0.12)] z-10 overflow-y-auto rounded-[32px] transition-colors duration-300">
         
+        {/* CHILD SELECTOR TABS */}
+        {devices.length > 0 && (
+          <section className="flex flex-wrap gap-2 px-2 shrink-0">
+            {devices.map(child => {
+              const isChildSelected = child.id === selectedChildId;
+              const isChildSosActive = child.isSosActive;
+              const activeZone = zones.find(z => z.isActive);
+              const dist = activeZone 
+                ? calculateDistance(child.latitude, child.longitude, Number(activeZone.centerLat), Number(activeZone.centerLng))
+                : 0;
+              const childIsOutside = activeZone && dist > Number(activeZone.radiusMeters);
+
+              let statusColor = 'border-slate-200 text-slate-600 dark:text-slate-400 bg-white/50 dark:bg-slate-850';
+              if (isChildSelected) {
+                statusColor = isChildSosActive 
+                  ? 'border-red-500 bg-red-500/10 text-red-600' 
+                  : childIsOutside 
+                    ? 'border-orange-500 bg-orange-500/10 text-orange-600' 
+                    : 'border-indigo-600 bg-indigo-600/10 text-indigo-600';
+              }
+
+              return (
+                <button
+                  key={child.id}
+                  onClick={() => setSelectedChildId(child.id)}
+                  className={`px-4 py-2 rounded-full border text-xs font-black uppercase tracking-wider transition-all duration-300 hover:scale-105 active:scale-95 ${statusColor}`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {isChildSosActive ? '🚨 ' : childIsOutside ? '⚠️ ' : '👦 '}
+                    {child.name}
+                  </span>
+                </button>
+              );
+            })}
+          </section>
+        )}
+        
         {/* REFINED STATUS CARD */}
         <section className={`p-6 rounded-[28px] border transition-all duration-500 ${isSafe ? 'bg-indigo-50/80 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 shadow-sm' : 'bg-red-50 dark:bg-red-500/10 border-red-100 dark:border-red-500/20 shadow-sm'}`}>
           <div className="flex items-center gap-5">
@@ -149,12 +266,42 @@ const Dashboard = () => {
               {/* COMPACT PILLS */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700/50 transition-colors duration-300">
-                  <Battery className={`w-3.5 h-3.5 ${isSafe ? 'text-indigo-500' : 'text-red-500'}`} />
-                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{childData?.battery ? `${childData.battery}%` : '---'}</span>
+                  {childData?.batteryStatus === 'charging' ? (
+                    <BatteryCharging className="w-3.5 h-3.5 text-green-500" />
+                  ) : (
+                    <Battery className={`w-3.5 h-3.5 ${
+                      childData?.battery <= 20 
+                        ? 'text-red-500' 
+                        : childData?.battery <= 50 
+                          ? 'text-orange-500' 
+                          : 'text-green-500'
+                    }`} />
+                  )}
+                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                    {childData?.battery !== undefined ? `${childData.battery}%` : '---'}
+                    {childData?.batteryStatus === 'charging' && ' (Charging)'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700/50 transition-colors duration-300">
-                  <Signal className={`w-3.5 h-3.5 ${isSafe ? 'text-indigo-500' : 'text-red-500'}`} />
-                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{childData?.isOnline ? t('strong') : t('offline')}</span>
+                  {!childData?.isOnline || childData?.connectionType === 'offline' ? (
+                    <WifiOff className="w-3.5 h-3.5 text-slate-400" />
+                  ) : childData?.connectionType === 'wifi' ? (
+                    <Wifi className="w-3.5 h-3.5 text-green-500" />
+                  ) : childData?.connectionType === 'cellular' ? (
+                    <Signal className="w-3.5 h-3.5 text-green-500" />
+                  ) : (
+                    <Wifi className="w-3.5 h-3.5 text-green-500" />
+                  )}
+                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                    {!childData?.isOnline || childData?.connectionType === 'offline' 
+                      ? t('offline') 
+                      : childData?.connectionType === 'wifi' 
+                        ? 'WiFi' 
+                        : childData?.connectionType === 'cellular' 
+                          ? 'Cellular' 
+                          : t('strong')
+                    }
+                  </span>
                 </div>
               </div>
             </div>
@@ -187,6 +334,81 @@ const Dashboard = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* DAY TIMELINE FEED */}
+        <section>
+          <div className="flex items-center gap-2 mb-4 px-2">
+            <Activity className="w-4 h-4 text-slate-400" />
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Day Timeline Log</h3>
+          </div>
+          
+          <div className="p-6 rounded-[28px] border border-slate-100 dark:border-slate-700/50 bg-slate-50/80 dark:bg-slate-800/80 max-h-[220px] overflow-y-auto flex flex-col gap-4">
+            {timelineEvents.length > 0 ? (
+              <div className="flex flex-col gap-4 relative">
+                {/* Timeline vertical bar */}
+                <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-slate-200 dark:bg-slate-700" />
+                
+                {timelineEvents.map((event, idx) => {
+                  let icon = <Activity className="w-3.5 h-3.5" />;
+                  let colorClass = 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50';
+                  
+                  if (event.type === 'alert_sos') {
+                    colorClass = 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50';
+                  } else if (event.type === 'sos_resolved') {
+                    colorClass = 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/50';
+                  } else if (event.type === 'alert_geofence') {
+                    colorClass = 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50';
+                  } else if (event.type === 'geofence_return') {
+                    colorClass = 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50';
+                  } else if (event.type === 'alert_speed') {
+                    colorClass = 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50';
+                  } else if (event.type === 'alert_anomaly') {
+                    colorClass = 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/50';
+                  }
+
+                  const hasCoords = event.latitude && event.longitude;
+
+                  return (
+                    <div 
+                      key={event.id} 
+                      className={`flex items-start gap-4 pl-1 relative group ${hasCoords ? 'cursor-pointer' : ''}`}
+                      onClick={() => {
+                        if (hasCoords && map) {
+                          map.panTo({ lat: Number(event.latitude), lng: Number(event.longitude) });
+                          map.setZoom(16);
+                        }
+                      }}
+                    >
+                      {/* Circle indicator */}
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 border-2 border-white dark:border-slate-800 ${colorClass}`}>
+                        {icon}
+                      </div>
+                      
+                      {/* Text details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-black text-slate-800 dark:text-slate-200 truncate">{event.title}</p>
+                          <span className="text-[9px] font-bold text-slate-400 shrink-0">{formatTime(event.timestamp)}</span>
+                        </div>
+                        <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">{event.message}</p>
+                        {hasCoords && (
+                          <span className="text-[8px] font-black text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 tracking-wider uppercase mt-1 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
+                            Click to show location
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <p className="text-xs font-black text-slate-700 dark:text-slate-300">No events logged today</p>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-wider">Waiting for telemetry logs...</p>
+              </div>
+            )}
           </div>
         </section>
 

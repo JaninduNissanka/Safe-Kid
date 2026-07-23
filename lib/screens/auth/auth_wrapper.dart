@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../guardian/guardian_shell.dart';
 import '../child/child_home_screen.dart';
+import '../child/child_waiting_screen.dart';
 import 'role_selection_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -58,8 +59,37 @@ class AuthWrapper extends StatelessWidget {
               }
             }
 
-            // Fallback for missing user doc or unknown role
-            return const RoleSelectionScreen();
+            // 4. Fallback: Check if there's an active pending pairing request for this anonymous UID
+            return FutureBuilder<QuerySnapshot>(
+              future: FirebaseFirestore.instance
+                  .collection('pairings')
+                  .doc('requests')
+                  .collection('items')
+                  .where('childUid', isEqualTo: snapshot.data!.uid)
+                  .where('status', isEqualTo: 'pending')
+                  .limit(1)
+                  .get(),
+              builder: (context, reqSnap) {
+                if (reqSnap.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (reqSnap.hasData && reqSnap.data!.docs.isNotEmpty) {
+                  final reqData = reqSnap.data!.docs.first.data() as Map<String, dynamic>;
+                  final childName = reqData['childName'] ?? 'Child';
+                  final pairingCode = reqData['pairingCode'] ?? '';
+                  return ChildWaitingScreen(
+                    childName: childName,
+                    pairingCode: pairingCode,
+                  );
+                }
+
+                // Default Fallback
+                return const RoleSelectionScreen();
+              },
+            );
           },
         );
       },
