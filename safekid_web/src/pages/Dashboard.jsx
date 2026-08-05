@@ -153,7 +153,14 @@ const Dashboard = () => {
           center={childData ? { lat: childData.latitude, lng: childData.longitude } : { lat: 6.9271, lng: 79.8612 }}
           zoom={14}
           onLoad={m => setMap(m)}
-          options={{ disableDefaultUI: false, mapId: "f40e06059d33261a" }}
+          options={{ 
+            disableDefaultUI: true, 
+            zoomControl: false,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            mapId: "f40e06059d33261a" 
+          }}
         >
           {devices.map(child => {
             const isChildSelected = child.id === selectedChildId;
@@ -212,7 +219,7 @@ const Dashboard = () => {
       </div>
 
       {/* FLOATING COMMAND PANEL (Glassmorphism) */}
-      <div className="absolute top-6 bottom-6 left-36 w-[400px] bg-white/85 dark:bg-slate-800/85 backdrop-blur-2xl border border-white/50 dark:border-slate-700/50 p-8 flex flex-col gap-8 shadow-[0_8px_40px_rgba(0,0,0,0.12)] z-10 overflow-y-auto rounded-[32px] transition-colors duration-300">
+      <div className="absolute top-6 bottom-6 left-32 w-[390px] bg-white/90 dark:bg-slate-800/90 backdrop-blur-2xl border border-white/60 dark:border-slate-700/60 p-6 flex flex-col gap-6 shadow-[0_8px_40px_rgba(0,0,0,0.12)] z-10 overflow-y-auto rounded-[32px] transition-colors duration-300">
         
         {/* CHILD SELECTOR TABS */}
         {devices.length > 0 && (

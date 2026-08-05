@@ -28,7 +28,10 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
   Future<void> _loadParentData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (doc.exists && mounted) {
         setState(() {
           _parentUid = user.uid;
@@ -43,7 +46,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
     final parts = name.trim().split(RegExp(r'\s+'));
     if (parts.length == 1) {
       final part = parts[0];
-      return part.length >= 2 ? part.substring(0, 2).toUpperCase() : part.toUpperCase();
+      return part.length >= 2
+          ? part.substring(0, 2).toUpperCase()
+          : part.toUpperCase();
     }
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
@@ -58,8 +63,10 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Edit Profile Info", style: TextStyle(fontWeight: FontWeight.bold)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("Edit Profile Info",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           content: Form(
             key: formKey,
             child: Column(
@@ -71,7 +78,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                     labelText: "Full Name",
                     prefixIcon: Icon(Icons.person),
                   ),
-                  validator: (val) => val == null || val.trim().isEmpty ? "Name cannot be empty" : null,
+                  validator: (val) => val == null || val.trim().isEmpty
+                      ? "Name cannot be empty"
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -98,7 +107,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
           actions: [
             TextButton(
               onPressed: updating ? null : () => Navigator.pop(c),
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              child: const Text("Cancel",
+                  style: TextStyle(
+                      color: Colors.grey, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
               onPressed: updating
@@ -109,27 +120,34 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                         try {
                           final newName = nameController.text.trim();
                           final newPhone = phoneController.text.trim();
-                          
+
                           final user = FirebaseAuth.instance.currentUser;
                           if (user != null) {
-                            await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user.uid)
+                                .update({
                               'name': newName,
                               'phoneNumber': newPhone.isEmpty ? null : newPhone,
                             });
                             await user.updateDisplayName(newName);
                           }
-                          
+
                           if (context.mounted) {
                             Navigator.pop(c);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Profile updated successfully"), backgroundColor: Colors.green),
+                              const SnackBar(
+                                  content: Text("Profile updated successfully"),
+                                  backgroundColor: Colors.green),
                             );
                           }
                         } catch (e) {
                           setDialogState(() => updating = false);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                              SnackBar(
+                                  content: Text("Error: $e"),
+                                  backgroundColor: Colors.red),
                             );
                           }
                         }
@@ -137,11 +155,18 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1D4ED8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: updating
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text("Save", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text("Save",
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -163,8 +188,10 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Change Password", style: TextStyle(fontWeight: FontWeight.bold)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("Change Password",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           content: Form(
             key: formKey,
             child: SingleChildScrollView(
@@ -178,11 +205,15 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                       labelText: "Current Password",
                       prefixIcon: const Icon(Icons.lock_open),
                       suffixIcon: IconButton(
-                        icon: Icon(obscureCurrent ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setDialogState(() => obscureCurrent = !obscureCurrent),
+                        icon: Icon(obscureCurrent
+                            ? Icons.visibility_off
+                            : Icons.visibility),
+                        onPressed: () => setDialogState(
+                            () => obscureCurrent = !obscureCurrent),
                       ),
                     ),
-                    validator: (val) => val == null || val.isEmpty ? "Required" : null,
+                    validator: (val) =>
+                        val == null || val.isEmpty ? "Required" : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -192,13 +223,18 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                       labelText: "New Password",
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
-                        icon: Icon(obscureNew ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setDialogState(() => obscureNew = !obscureNew),
+                        icon: Icon(obscureNew
+                            ? Icons.visibility_off
+                            : Icons.visibility),
+                        onPressed: () =>
+                            setDialogState(() => obscureNew = !obscureNew),
                       ),
                     ),
                     validator: (val) {
                       if (val == null || val.isEmpty) return "Required";
-                      if (val.length < 6) return "Password must be at least 6 characters";
+                      if (val.length < 6) {
+                        return "Password must be at least 6 characters";
+                      }
                       return null;
                     },
                   ),
@@ -210,13 +246,18 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                       labelText: "Confirm New Password",
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                        icon: Icon(obscureConfirm
+                            ? Icons.visibility_off
+                            : Icons.visibility),
+                        onPressed: () => setDialogState(
+                            () => obscureConfirm = !obscureConfirm),
                       ),
                     ),
                     validator: (val) {
                       if (val == null || val.isEmpty) return "Required";
-                      if (val != newPasswordController.text) return "Passwords do not match";
+                      if (val != newPasswordController.text) {
+                        return "Passwords do not match";
+                      }
                       return null;
                     },
                   ),
@@ -227,7 +268,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
           actions: [
             TextButton(
               onPressed: updating ? null : () => Navigator.pop(c),
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              child: const Text("Cancel",
+                  style: TextStyle(
+                      color: Colors.grey, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
               onPressed: updating
@@ -243,12 +286,16 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               password: currentPasswordController.text,
                             );
                             await user.reauthenticateWithCredential(cred);
-                            await user.updatePassword(newPasswordController.text);
-                            
+                            await user
+                                .updatePassword(newPasswordController.text);
+
                             if (context.mounted) {
                               Navigator.pop(c);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Password updated successfully"), backgroundColor: Colors.green),
+                                const SnackBar(
+                                    content:
+                                        Text("Password updated successfully"),
+                                    backgroundColor: Colors.green),
                               );
                             }
                           }
@@ -260,14 +307,18 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                           }
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
+                              SnackBar(
+                                  content: Text(errMsg),
+                                  backgroundColor: Colors.red),
                             );
                           }
                         } catch (e) {
                           setDialogState(() => updating = false);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                              SnackBar(
+                                  content: Text("Error: $e"),
+                                  backgroundColor: Colors.red),
                             );
                           }
                         }
@@ -275,11 +326,18 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1D4ED8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: updating
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text("Change", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text("Change",
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -297,40 +355,61 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Notification Settings", style: TextStyle(fontWeight: FontWeight.bold)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("Notification Settings",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
-                title: const Text("SOS Alerts", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                subtitle: const Text("Instant push notifications when child triggers SOS", style: TextStyle(fontSize: 12)),
+                title: const Text("SOS Alerts",
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                subtitle: const Text(
+                    "Instant push notifications when child triggers SOS",
+                    style: TextStyle(fontSize: 12)),
                 value: sos,
                 activeThumbColor: Colors.indigo,
-                onChanged: updating ? null : (val) => setDialogState(() => sos = val),
+                onChanged:
+                    updating ? null : (val) => setDialogState(() => sos = val),
               ),
               const Divider(),
               SwitchListTile(
-                title: const Text("Safe Zone Breaches", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                subtitle: const Text("Alert when child leaves or enters a safe zone", style: TextStyle(fontSize: 12)),
+                title: const Text("Safe Zone Breaches",
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                subtitle: const Text(
+                    "Alert when child leaves or enters a safe zone",
+                    style: TextStyle(fontSize: 12)),
                 value: geofence,
                 activeThumbColor: Colors.indigo,
-                onChanged: updating ? null : (val) => setDialogState(() => geofence = val),
+                onChanged: updating
+                    ? null
+                    : (val) => setDialogState(() => geofence = val),
               ),
               const Divider(),
               SwitchListTile(
-                title: const Text("Speed Limit Violations", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                subtitle: const Text("Alert when child exceeds rule speed threshold", style: TextStyle(fontSize: 12)),
+                title: const Text("Speed Limit Violations",
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                subtitle: const Text(
+                    "Alert when child exceeds rule speed threshold",
+                    style: TextStyle(fontSize: 12)),
                 value: speed,
                 activeThumbColor: Colors.indigo,
-                onChanged: updating ? null : (val) => setDialogState(() => speed = val),
+                onChanged: updating
+                    ? null
+                    : (val) => setDialogState(() => speed = val),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: updating ? null : () => Navigator.pop(c),
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              child: const Text("Cancel",
+                  style: TextStyle(
+                      color: Colors.grey, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
               onPressed: updating
@@ -340,7 +419,10 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                       try {
                         final user = FirebaseAuth.instance.currentUser;
                         if (user != null) {
-                          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .update({
                             'notifications': {
                               'sosAlerts': sos,
                               'geofenceBreaches': geofence,
@@ -351,25 +433,36 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                         if (context.mounted) {
                           Navigator.pop(c);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Notification settings saved"), backgroundColor: Colors.green),
+                            const SnackBar(
+                                content: Text("Notification settings saved"),
+                                backgroundColor: Colors.green),
                           );
                         }
                       } catch (e) {
                         setDialogState(() => updating = false);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                            SnackBar(
+                                content: Text("Error: $e"),
+                                backgroundColor: Colors.red),
                           );
                         }
                       }
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1D4ED8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: updating
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text("Save", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text("Save",
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -381,7 +474,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text("Terms of Service", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Terms of Service",
+            style: TextStyle(fontWeight: FontWeight.bold)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: const SingleChildScrollView(
           child: Text(
@@ -402,7 +496,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text("Close", style: TextStyle(color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold)),
+            child: const Text("Close",
+                style: TextStyle(
+                    color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -413,7 +509,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text("Privacy Policy", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Privacy Policy",
+            style: TextStyle(fontWeight: FontWeight.bold)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: const SingleChildScrollView(
           child: Text(
@@ -434,7 +531,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text("Close", style: TextStyle(color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold)),
+            child: const Text("Close",
+                style: TextStyle(
+                    color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -445,14 +544,16 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text("Help & Support", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Help & Support",
+            style: TextStyle(fontWeight: FontWeight.bold)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: const SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Frequently Asked Questions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("Frequently Asked Questions",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               SizedBox(height: 8),
               Text(
                 "Q: How do I pair a child?\n"
@@ -464,7 +565,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                 style: TextStyle(fontSize: 14, height: 1.4),
               ),
               Divider(height: 24),
-              Text("Contact Us", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("Contact Us",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               SizedBox(height: 8),
               Text(
                 "Support Email: support@safekid.com\n"
@@ -478,7 +580,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text("Close", style: TextStyle(color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold)),
+            child: const Text("Close",
+                style: TextStyle(
+                    color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -489,16 +593,19 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool deleting = false;
-    
+
     final user = FirebaseAuth.instance.currentUser;
-    final isGoogleUser = user?.providerData.any((p) => p.providerId == 'google.com') ?? false;
+    final isGoogleUser =
+        user?.providerData.any((p) => p.providerId == 'google.com') ?? false;
 
     showDialog(
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text("⚠️ Delete Account?", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("⚠️ Delete Account?",
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           content: Form(
             key: formKey,
             child: Column(
@@ -507,11 +614,13 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
               children: [
                 const Text(
                   "This action is permanent and cannot be undone. Deleting your account will purge all children pairings, safe zones, speed rules, location histories, and alerts.",
-                  style: TextStyle(fontSize: 14, color: Colors.redAccent, height: 1.4),
+                  style: TextStyle(
+                      fontSize: 14, color: Colors.redAccent, height: 1.4),
                 ),
                 const SizedBox(height: 16),
                 if (!isGoogleUser) ...[
-                  const Text("Please enter your current password to confirm deletion:"),
+                  const Text(
+                      "Please enter your current password to confirm deletion:"),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: passwordController,
@@ -520,7 +629,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                       labelText: "Password",
                       prefixIcon: Icon(Icons.lock),
                     ),
-                    validator: (val) => val == null || val.isEmpty ? "Required" : null,
+                    validator: (val) =>
+                        val == null || val.isEmpty ? "Required" : null,
                   ),
                 ] else ...[
                   const Text("Confirm permanent account deletion:"),
@@ -531,7 +641,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
           actions: [
             TextButton(
               onPressed: deleting ? null : () => Navigator.pop(c),
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              child: const Text("Cancel",
+                  style: TextStyle(
+                      color: Colors.grey, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
               onPressed: deleting
@@ -543,7 +655,7 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                           final user = FirebaseAuth.instance.currentUser;
                           if (user != null) {
                             final uid = user.uid;
-                            
+
                             if (!isGoogleUser) {
                               final cred = EmailAuthProvider.credential(
                                   email: user.email!,
@@ -551,24 +663,32 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               await user.reauthenticateWithCredential(cred);
                             }
 
-                            final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+                            final userDoc = await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(uid)
+                                .get();
                             final pairingCode = userDoc.data()?['pairingCode'];
 
                             final batch = FirebaseFirestore.instance.batch();
 
-                            final childrenQuery = await FirebaseFirestore.instance
+                            final childrenQuery = await FirebaseFirestore
+                                .instance
                                 .collection('users')
                                 .where('guardianIds', arrayContains: uid)
                                 .get();
-                            
+
                             for (var childDoc in childrenQuery.docs) {
                               batch.delete(childDoc.reference);
                             }
 
-                            if (pairingCode != null && pairingCode != "No Code") {
-                              batch.delete(FirebaseFirestore.instance.collection('rules').doc(pairingCode));
+                            if (pairingCode != null &&
+                                pairingCode != "No Code") {
+                              batch.delete(FirebaseFirestore.instance
+                                  .collection('rules')
+                                  .doc(pairingCode));
 
-                              final pairingsQuery = await FirebaseFirestore.instance
+                              final pairingsQuery = await FirebaseFirestore
+                                  .instance
                                   .collection('pairings')
                                   .doc('requests')
                                   .collection('items')
@@ -578,7 +698,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                                 batch.delete(doc.reference);
                               }
 
-                              final zonesQuery = await FirebaseFirestore.instance
+                              final zonesQuery = await FirebaseFirestore
+                                  .instance
                                   .collection('zones')
                                   .doc(pairingCode)
                                   .collection('items')
@@ -586,23 +707,31 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               for (var doc in zonesQuery.docs) {
                                 batch.delete(doc.reference);
                               }
-                              batch.delete(FirebaseFirestore.instance.collection('zones').doc(pairingCode));
+                              batch.delete(FirebaseFirestore.instance
+                                  .collection('zones')
+                                  .doc(pairingCode));
 
-                              final devicesQuery = await FirebaseFirestore.instance
+                              final devicesQuery = await FirebaseFirestore
+                                  .instance
                                   .collection('locations')
                                   .doc(pairingCode)
                                   .collection('devices')
                                   .get();
                               for (var deviceDoc in devicesQuery.docs) {
-                                final historyQuery = await deviceDoc.reference.collection('history').get();
+                                final historyQuery = await deviceDoc.reference
+                                    .collection('history')
+                                    .get();
                                 for (var hDoc in historyQuery.docs) {
                                   batch.delete(hDoc.reference);
                                 }
                                 batch.delete(deviceDoc.reference);
                               }
-                              batch.delete(FirebaseFirestore.instance.collection('locations').doc(pairingCode));
+                              batch.delete(FirebaseFirestore.instance
+                                  .collection('locations')
+                                  .doc(pairingCode));
 
-                              final alertsQuery = await FirebaseFirestore.instance
+                              final alertsQuery = await FirebaseFirestore
+                                  .instance
                                   .collection('alerts')
                                   .doc(pairingCode)
                                   .collection('items')
@@ -610,10 +739,14 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               for (var doc in alertsQuery.docs) {
                                 batch.delete(doc.reference);
                               }
-                              batch.delete(FirebaseFirestore.instance.collection('alerts').doc(pairingCode));
+                              batch.delete(FirebaseFirestore.instance
+                                  .collection('alerts')
+                                  .doc(pairingCode));
                             }
 
-                            batch.delete(FirebaseFirestore.instance.collection('users').doc(uid));
+                            batch.delete(FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(uid));
                             await batch.commit();
                             await user.delete();
 
@@ -621,11 +754,16 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               Navigator.pop(c);
                               Navigator.pushAndRemoveUntil(
                                 context,
-                                MaterialPageRoute(builder: (_) => const GuardianLoginScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const GuardianLoginScreen()),
                                 (route) => false,
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Account successfully deleted"), backgroundColor: Colors.red),
+                                const SnackBar(
+                                    content:
+                                        Text("Account successfully deleted"),
+                                    backgroundColor: Colors.red),
                               );
                             }
                           }
@@ -635,18 +773,23 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                           if (e.code == 'wrong-password') {
                             errMsg = "Incorrect password";
                           } else if (e.code == 'requires-recent-login') {
-                            errMsg = "Please sign out and sign back in before deleting account.";
+                            errMsg =
+                                "Please sign out and sign back in before deleting account.";
                           }
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
+                              SnackBar(
+                                  content: Text(errMsg),
+                                  backgroundColor: Colors.red),
                             );
                           }
                         } catch (e) {
                           setDialogState(() => deleting = false);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                              SnackBar(
+                                  content: Text("Error: $e"),
+                                  backgroundColor: Colors.red),
                             );
                           }
                         }
@@ -654,11 +797,18 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: deleting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text("Delete Account", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text("Delete Account",
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -670,13 +820,17 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text("Remove Child", style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text("Are you sure you want to remove '$childName'? This will stop tracking their location and disconnect them from your dashboard."),
+        title: const Text("Remove Child",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(
+            "Are you sure you want to remove '$childName'? This will stop tracking their location and disconnect them from your dashboard."),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            child: const Text("Cancel",
+                style:
+                    TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -685,14 +839,14 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text("Removing $childName...")),
                 );
-                
+
                 await AuthService().removeChild(
                   parentId: _parentUid!,
                   childUid: childUid,
                   childName: childName,
                   pairingCode: _pairingCode!,
                 );
-                
+
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -705,9 +859,12 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text("Remove", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text("Remove",
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -812,7 +969,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                 .doc(_pairingCode)
                 .snapshots(),
             builder: (context, snap) {
-              final data = snap.hasData ? snap.data!.data() as Map<String, dynamic>? : null;
+              final data = snap.hasData
+                  ? snap.data!.data() as Map<String, dynamic>?
+                  : null;
               final speed = data?['speedLimitKmh'];
               final text = speed != null ? "$speed km/h" : "Not Set";
               return _buildStatItem(
@@ -866,7 +1025,7 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
               fontSize: 11,
               color: Colors.grey,
               fontWeight: FontWeight.bold,
-          ),
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -932,22 +1091,28 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
         ],
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.hasData || !snapshot.data!.exists) {
             return const Center(child: Text("Error loading profile details"));
           }
-          
+
           final userData = snapshot.data!.data() as Map<String, dynamic>?;
           final name = userData?['name'] ?? user.displayName ?? "Guardian User";
-          final email = userData?['email'] ?? user.email ?? "guardian@safekid.com";
+          final email =
+              userData?['email'] ?? user.email ?? "guardian@safekid.com";
           final phone = userData?['phoneNumber'] as String?;
           final pairingCode = userData?['pairingCode'] ?? "No Code";
           final twoFactorEnabled = userData?['twoFactorEnabled'] ?? false;
-          final notificationPrefs = userData?['notifications'] as Map<String, dynamic>?;
+          final notificationPrefs =
+              userData?['notifications'] as Map<String, dynamic>?;
 
           if (_parentUid != user.uid || _pairingCode != pairingCode) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -982,7 +1147,10 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
-                                color: Theme.of(context).textTheme.bodyLarge?.color,
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.color,
                               ),
                             ),
                             Text(
@@ -1008,10 +1176,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-
                       _buildStatsRow(user.uid),
                       const SizedBox(height: 32),
-
                       _buildSectionHeader("profile.account_security".tr()),
                       _buildSettingsGroup([
                         _buildSettingTile(
@@ -1042,7 +1208,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text(val ? "2FA Enabled" : "2FA Disabled"),
+                                      content: Text(
+                                          val ? "2FA Enabled" : "2FA Disabled"),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
@@ -1050,7 +1217,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               } catch (e) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                                    SnackBar(
+                                        content: Text("Error: $e"),
+                                        backgroundColor: Colors.red),
                                   );
                                 }
                               }
@@ -1059,36 +1228,45 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                         ),
                       ]),
                       const SizedBox(height: 24),
-
                       _buildSectionHeader("profile.preferences".tr()),
                       _buildSettingsGroup([
                         _buildSettingTile(
                           icon: Icons.notifications_none,
                           title: "profile.notification_settings".tr(),
                           subtitle: "SOS, Safe Zone, and Speed notifications",
-                          onTap: () => _showNotificationSettingsDialog(notificationPrefs),
+                          onTap: () => _showNotificationSettingsDialog(
+                              notificationPrefs),
                         ),
                         _buildSettingTile(
                           icon: Icons.palette_outlined,
                           title: "App Theme",
-                          subtitle: settings.isDarkMode ? "Dark Theme Enabled" : "Light Theme Enabled",
+                          subtitle: settings.isDarkMode
+                              ? "Dark Theme Enabled"
+                              : "Light Theme Enabled",
                           trailing: Text(
                             settings.isDarkMode ? "Dark" : "Light",
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey),
                           ),
                         ),
                         _buildSettingTile(
                           icon: Icons.language,
                           title: "App Language",
-                          subtitle: context.locale.languageCode == 'si' ? "Sinhala Language" : "English Language",
+                          subtitle: context.locale.languageCode == 'si'
+                              ? "Sinhala Language"
+                              : "English Language",
                           trailing: Text(
-                            context.locale.languageCode == 'si' ? "Sinhala" : "English",
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                            context.locale.languageCode == 'si'
+                                ? "Sinhala"
+                                : "English",
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey),
                           ),
                         ),
                       ]),
                       const SizedBox(height: 24),
-
                       if (_pairingCode != null) ...[
                         _buildSectionHeader("Paired Children"),
                         StreamBuilder<QuerySnapshot>(
@@ -1098,56 +1276,76 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               .where('guardianIds', arrayContains: user.uid)
                               .snapshots(),
                           builder: (context, childSnapshot) {
-                            if (childSnapshot.connectionState == ConnectionState.waiting && !childSnapshot.hasData) {
+                            if (childSnapshot.connectionState ==
+                                    ConnectionState.waiting &&
+                                !childSnapshot.hasData) {
                               return _buildSettingsGroup([
                                 const Padding(
                                   padding: EdgeInsets.all(20.0),
-                                  child: Center(child: CircularProgressIndicator()),
+                                  child: Center(
+                                      child: CircularProgressIndicator()),
                                 )
                               ]);
                             }
-                            if (!childSnapshot.hasData || childSnapshot.data!.docs.isEmpty) {
+                            if (!childSnapshot.hasData ||
+                                childSnapshot.data!.docs.isEmpty) {
                               return _buildSettingsGroup([
                                 const ListTile(
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 8),
                                   title: Text(
                                     "No children paired yet",
-                                    style: TextStyle(color: Colors.grey, fontSize: 15),
+                                    style: TextStyle(
+                                        color: Colors.grey, fontSize: 15),
                                   ),
-                                  leading: Icon(Icons.info_outline, color: Colors.grey),
+                                  leading: Icon(Icons.info_outline,
+                                      color: Colors.grey),
                                 )
                               ]);
                             }
                             final children = childSnapshot.data!.docs;
                             return _buildSettingsGroup(
                               children.map((childDoc) {
-                                final childData = childDoc.data() as Map<String, dynamic>;
+                                final childData =
+                                    childDoc.data() as Map<String, dynamic>;
                                 final String childUid = childDoc.id;
-                                final String childName = childData['name'] ?? 'Child';
+                                final String childName =
+                                    childData['name'] ?? 'Child';
                                 return ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 4),
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: Colors.blue.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: const Icon(Icons.face, color: Colors.blue, size: 20),
+                                    child: const Icon(Icons.face,
+                                        color: Colors.blue, size: 20),
                                   ),
                                   title: Text(
                                     childName,
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                                      color: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.color,
                                     ),
                                   ),
-                                  subtitle: const Text("Device Paired & Syncing", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                  subtitle: const Text(
+                                      "Device Paired & Syncing",
+                                      style: TextStyle(
+                                          fontSize: 12, color: Colors.grey)),
                                   trailing: TextButton(
-                                    onPressed: () => _confirmRemoveChild(childUid, childName),
+                                    onPressed: () => _confirmRemoveChild(
+                                        childUid, childName),
                                     child: const Text(
                                       "Remove",
-                                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 );
@@ -1157,7 +1355,6 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                         ),
                         const SizedBox(height: 24),
                       ],
-
                       _buildSectionHeader("App Information"),
                       _buildSettingsGroup([
                         _buildSettingTile(
@@ -1178,7 +1375,10 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               const SizedBox(width: 6),
                               const Text(
                                 "Connected",
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Colors.grey),
                               ),
                             ],
                           ),
@@ -1203,8 +1403,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                         ),
                       ]),
                       const SizedBox(height: 24),
-
-                      _buildSectionHeader("profile.danger_zone".tr(), isDanger: true),
+                      _buildSectionHeader("profile.danger_zone".tr(),
+                          isDanger: true),
                       _buildSettingsGroup([
                         _buildSettingTile(
                           icon: Icons.logout,
@@ -1215,21 +1415,33 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (c) => AlertDialog(
-                                title: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.bold)),
-                                content: const Text("Are you sure you want to sign out from SafeKid?"),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                title: const Text("Sign Out",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                content: const Text(
+                                    "Are you sure you want to sign out from SafeKid?"),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20)),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(c, false),
-                                    child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                                    child: const Text("Cancel",
+                                        style: TextStyle(
+                                            color: Colors.grey,
+                                            fontWeight: FontWeight.bold)),
                                   ),
                                   ElevatedButton(
                                     onPressed: () => Navigator.pop(c, true),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF1D4ED8),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
                                     ),
-                                    child: const Text("Sign Out", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                    child: const Text("Sign Out",
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),
@@ -1240,7 +1452,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                               if (context.mounted) {
                                 Navigator.pushAndRemoveUntil(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const GuardianLoginScreen()),
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const GuardianLoginScreen()),
                                   (route) => false,
                                 );
                               }
@@ -1250,7 +1464,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                         _buildSettingTile(
                           icon: Icons.delete_forever,
                           title: "profile.delete_account".tr(),
-                          subtitle: "Permanently delete account and all paired child data",
+                          subtitle:
+                              "Permanently delete account and all paired child data",
                           isDanger: true,
                           onTap: _showDeleteAccountDialog,
                         ),
@@ -1313,7 +1528,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isDanger ? Colors.red.withOpacity(0.1) : Colors.indigo.withOpacity(0.1),
+          color: isDanger
+              ? Colors.red.withOpacity(0.1)
+              : Colors.indigo.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
@@ -1327,7 +1544,9 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: isDanger ? Colors.red : Theme.of(context).textTheme.bodyLarge?.color,
+          color: isDanger
+              ? Colors.red
+              : Theme.of(context).textTheme.bodyLarge?.color,
         ),
       ),
       subtitle: subtitle != null
@@ -1340,7 +1559,10 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
               ),
             )
           : null,
-      trailing: trailing ?? (onTap != null ? const Icon(Icons.chevron_right, size: 20, color: Colors.grey) : null),
+      trailing: trailing ??
+          (onTap != null
+              ? const Icon(Icons.chevron_right, size: 20, color: Colors.grey)
+              : null),
       onTap: onTap,
     );
   }
@@ -1385,7 +1607,9 @@ class CustomAnimatedToggle extends StatelessWidget {
                   child: leftIcon != null
                       ? Icon(leftIcon, size: 16, color: Colors.white)
                       : leftText != null
-                          ? Text(leftText!, style: const TextStyle(color: Colors.white, fontSize: 16))
+                          ? Text(leftText!,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 16))
                           : const SizedBox.shrink(),
                 ),
               ),
@@ -1396,7 +1620,9 @@ class CustomAnimatedToggle extends StatelessWidget {
                   child: rightIcon != null
                       ? Icon(rightIcon, size: 16, color: Colors.white)
                       : rightText != null
-                          ? Text(rightText!, style: const TextStyle(color: Colors.white, fontSize: 16))
+                          ? Text(rightText!,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 16))
                           : const SizedBox.shrink(),
                 ),
               ),
@@ -1487,10 +1713,14 @@ class ProfileLogoPainter extends CustomPainter {
 
     final torsoPath = Path();
     torsoPath.moveTo(cx - w * 0.28, cy + h * 0.32);
-    torsoPath.quadraticBezierTo(cx - w * 0.26, cy + h * 0.11, cx - w * 0.13, cy + h * 0.09);
-    torsoPath.quadraticBezierTo(cx, cy + h * 0.13, cx + w * 0.13, cy + h * 0.09);
-    torsoPath.quadraticBezierTo(cx + w * 0.26, cy + h * 0.11, cx + w * 0.28, cy + h * 0.32);
-    torsoPath.quadraticBezierTo(cx, cy + h * 0.38, cx - w * 0.28, cy + h * 0.32);
+    torsoPath.quadraticBezierTo(
+        cx - w * 0.26, cy + h * 0.11, cx - w * 0.13, cy + h * 0.09);
+    torsoPath.quadraticBezierTo(
+        cx, cy + h * 0.13, cx + w * 0.13, cy + h * 0.09);
+    torsoPath.quadraticBezierTo(
+        cx + w * 0.26, cy + h * 0.11, cx + w * 0.28, cy + h * 0.32);
+    torsoPath.quadraticBezierTo(
+        cx, cy + h * 0.38, cx - w * 0.28, cy + h * 0.32);
     torsoPath.close();
     canvas.drawPath(torsoPath, whiteFillPaint);
 

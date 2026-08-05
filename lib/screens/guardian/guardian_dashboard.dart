@@ -8,7 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:intl/intl.dart';
 import '../../services/auth_service.dart';
 import '../auth/role_selection_screen.dart';
 import '../../services/route_anomaly_detector.dart';
@@ -118,7 +117,10 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
         .where('isActive', isEqualTo: true).snapshots().listen((snap) {
       if (!mounted) return;
       setState(() {
-        _circles = snap.docs.map((doc) {
+        _circles = snap.docs.where((doc) {
+          final data = doc.data();
+          return _isZoneScheduleActiveNow(data);
+        }).map((doc) {
           final data = doc.data();
           return Circle(
             circleId: CircleId(doc.id),
@@ -312,6 +314,54 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
     final img = await pictureRecorder.endRecording().toImage(size.toInt(), size.toInt());
     final data = await img.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.fromBytes(data!.buffer.asUint8List());
+  }
+
+  bool _isZoneScheduleActiveNow(Map<String, dynamic> data) {
+    final bool hasSchedule = data['hasSchedule'] ?? false;
+    if (!hasSchedule) return true;
+
+    final now = DateTime.now();
+
+    // 1. Date Range Check
+    final bool hasDateRange = data['hasDateRange'] ?? false;
+    if (hasDateRange) {
+      final String? startDateStr = data['startDate'];
+      final String? endDateStr = data['endDate'];
+      if (startDateStr != null && endDateStr != null) {
+        try {
+          final startDt = DateTime.parse(startDateStr);
+          final endDt = DateTime.parse(endDateStr).add(const Duration(days: 1));
+          if (now.isBefore(startDt) || now.isAfter(endDt)) return false;
+        } catch (_) {}
+      }
+    }
+
+    // 2. Days of Week Check
+    final List<dynamic>? selectedDays = data['selectedDays'];
+    if (selectedDays != null && selectedDays.isNotEmpty) {
+      if (!selectedDays.contains(now.weekday)) return false;
+    }
+
+    // 3. Time Window Check
+    final String? startTimeStr = data['startTime'];
+    final String? endTimeStr = data['endTime'];
+    if (startTimeStr != null && endTimeStr != null) {
+      try {
+        final currentMinutes = now.hour * 60 + now.minute;
+        final startParts = startTimeStr.split(':');
+        final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+        final endParts = endTimeStr.split(':');
+        final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+
+        if (startMinutes <= endMinutes) {
+          return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+        } else {
+          return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+        }
+      } catch (_) {}
+    }
+
+    return true;
   }
 
   void _checkGeofenceStatus() {

@@ -575,12 +575,12 @@ class AlertLogoPainter extends CustomPainter {
 
     // 3. Draw inner blue circle with linear gradient (cyan/light blue to royal blue)
     final rect = Rect.fromCircle(center: Offset(w * 0.5, h * 0.5), radius: w * 0.40);
-    final gradient = LinearGradient(
+    const gradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        const Color(0xFF38BDF8), // Cyan / Sky blue at top
-        const Color(0xFF1D4ED8), // Royal blue at bottom
+        Color(0xFF38BDF8), // Cyan / Sky blue at top
+        Color(0xFF1D4ED8), // Royal blue at bottom
       ],
     );
     final Paint gradientPaint = Paint()
@@ -599,7 +599,7 @@ class AlertLogoPainter extends CustomPainter {
     final cy = h * 0.67;
 
     // Scale factor for rounded corner endpoints
-    final f = 0.16;
+    const f = 0.16;
     
     final apvX = ax + f * (cx - ax);
     final apvY = ay + f * (cy - ay);

@@ -62,7 +62,7 @@ const Alerts = () => {
   };
 
   return (
-    <div className="p-10 max-w-6xl mx-auto transition-colors duration-300">
+    <div className="p-10 pl-32 max-w-6xl mx-auto transition-colors duration-300">
       <div className="flex items-center justify-between mb-10">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white transition-colors duration-300">{t('safetyAlerts')}</h1>

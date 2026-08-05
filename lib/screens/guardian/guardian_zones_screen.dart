@@ -27,6 +27,16 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
   bool _hasCustomCenter = false;
   bool _saving = false;
 
+  // Active Time Schedule Variables (Time, Days of Week, Date Range)
+  bool _hasSchedule = false;
+  List<int> _selectedDays = [1, 2, 3, 4, 5]; // Mon to Fri by default
+  TimeOfDay _startTime = const TimeOfDay(hour: 8, minute: 0);
+  TimeOfDay _endTime = const TimeOfDay(hour: 13, minute: 30);
+
+  bool _hasDateRange = false;
+  DateTime _startDate = DateTime.now();
+  DateTime _endDate = DateTime.now().add(const Duration(days: 90));
+
   StreamSubscription? _childLocSub;
   LatLng? _childLocation;
 
@@ -95,12 +105,24 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
         batch.update(doc.reference, {'isActive': false});
       }
 
+      final String startStr = "${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}";
+      final String endStr = "${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}";
+      final String startDateStr = "${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}";
+      final String endDateStr = "${_endDate.year}-${_endDate.month.toString().padLeft(2, '0')}-${_endDate.day.toString().padLeft(2, '0')}";
+
       final newZoneRef = zonesRef.doc();
       batch.set(newZoneRef, {
         'name': 'Active Safe Zone',
         'centerLat': _zoneCenter.latitude,
         'centerLng': _zoneCenter.longitude,
         'radiusMeters': _radiusMeters.round(),
+        'hasSchedule': _hasSchedule,
+        'selectedDays': _selectedDays,
+        'startTime': startStr,
+        'endTime': endStr,
+        'hasDateRange': _hasDateRange,
+        'startDate': startDateStr,
+        'endDate': endDateStr,
         'createdAt': FieldValue.serverTimestamp(),
         'isActive': true,
       });
@@ -427,7 +449,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 12),
+                                 const SizedBox(height: 12),
                                 SliderTheme(
                                   data: SliderTheme.of(context).copyWith(
                                     activeTrackColor: Colors.blue,
@@ -454,6 +476,236 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                                     ],
                                   ),
                                 ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Active Time Schedule Card
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: Theme.of(context).brightness == Brightness.light
+                                  ? Colors.blue.withOpacity(0.15)
+                                  : Colors.white10,
+                            ),
+                          ),
+                          color: Theme.of(context).cardColor,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            "Active Time Schedule",
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            "Restrict boundary to specific hours (e.g. School 8:00 AM - 1:30 PM)",
+                                            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Switch(
+                                      value: _hasSchedule,
+                                      activeColor: Colors.blue,
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _hasSchedule = val;
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                if (_hasSchedule) ...[
+                                  const SizedBox(height: 14),
+                                  const Text("RECURRING DAYS OF WEEK", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      _buildDayChip("Mon", 1),
+                                      _buildDayChip("Tue", 2),
+                                      _buildDayChip("Wed", 3),
+                                      _buildDayChip("Thu", 4),
+                                      _buildDayChip("Fri", 5),
+                                      _buildDayChip("Sat", 6),
+                                      _buildDayChip("Sun", 7),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () async {
+                                            final picked = await showTimePicker(
+                                              context: context,
+                                              initialTime: _startTime,
+                                            );
+                                            if (picked != null) {
+                                              setState(() => _startTime = picked);
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.withOpacity(0.08),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text("START TIME", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.access_time_rounded, size: 16, color: Colors.blue),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      _startTime.format(context),
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () async {
+                                            final picked = await showTimePicker(
+                                              context: context,
+                                              initialTime: _endTime,
+                                            );
+                                            if (picked != null) {
+                                              setState(() => _endTime = picked);
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.withOpacity(0.08),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text("END TIME", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.access_time_filled_rounded, size: 16, color: Colors.blue),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      _endTime.format(context),
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text("Limit to Calendar Date Range", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyMedium?.color)),
+                                      Switch(
+                                        value: _hasDateRange,
+                                        activeColor: Colors.blue,
+                                        onChanged: (v) => setState(() => _hasDateRange = v),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_hasDateRange) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: InkWell(
+                                            onTap: () async {
+                                              final picked = await showDatePicker(
+                                                context: context,
+                                                initialDate: _startDate,
+                                                firstDate: DateTime(2025),
+                                                lastDate: DateTime(2030),
+                                              );
+                                              if (picked != null) setState(() => _startDate = picked);
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.indigo.withOpacity(0.05),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(color: Colors.indigo.withOpacity(0.15)),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text("START DATE", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                                  const SizedBox(height: 2),
+                                                  Text("${_startDate.day}/${_startDate.month}/${_startDate.year}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: InkWell(
+                                            onTap: () async {
+                                              final picked = await showDatePicker(
+                                                context: context,
+                                                initialDate: _endDate,
+                                                firstDate: DateTime(2025),
+                                                lastDate: DateTime(2030),
+                                              );
+                                              if (picked != null) setState(() => _endDate = picked);
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.indigo.withOpacity(0.05),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(color: Colors.indigo.withOpacity(0.15)),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text("END DATE", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                                  const SizedBox(height: 2),
+                                                  Text("${_endDate.day}/${_endDate.month}/${_endDate.year}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
                               ],
                             ),
                           ),
@@ -498,6 +750,96 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
     );
   }
 
+  Widget _buildDayChip(String label, int dayIndex) {
+    final bool isSelected = _selectedDays.contains(dayIndex);
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            if (_selectedDays.length > 1) {
+              _selectedDays.remove(dayIndex);
+            }
+          } else {
+            _selectedDays.add(dayIndex);
+          }
+        });
+      },
+      child: Container(
+        width: 38,
+        height: 36,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue : Colors.grey.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey.shade600,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _isZoneActiveNow(Map<String, dynamic> z) {
+    final bool isActive = z['isActive'] ?? false;
+    if (!isActive) return false;
+
+    final bool hasSchedule = z['hasSchedule'] ?? false;
+    if (!hasSchedule) return true; // 24/7 active
+
+    final now = DateTime.now();
+
+    // 1. Date Range Check
+    final bool hasDateRange = z['hasDateRange'] ?? false;
+    if (hasDateRange) {
+      final String? startDateStr = z['startDate'];
+      final String? endDateStr = z['endDate'];
+      if (startDateStr != null && endDateStr != null) {
+        try {
+          final startDt = DateTime.parse(startDateStr);
+          final endDt = DateTime.parse(endDateStr).add(const Duration(days: 1));
+          if (now.isBefore(startDt) || now.isAfter(endDt)) {
+            return false;
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Days of Week Check
+    final List<dynamic>? days = z['selectedDays'];
+    if (days != null && days.isNotEmpty) {
+      final int weekday = now.weekday; // 1 = Mon ... 7 = Sun
+      if (!days.contains(weekday)) {
+        return false;
+      }
+    }
+
+    // 3. Time Window Check
+    final String? startTimeStr = z['startTime'];
+    final String? endTimeStr = z['endTime'];
+    if (startTimeStr != null && endTimeStr != null) {
+      try {
+        final currentMinutes = now.hour * 60 + now.minute;
+        final startParts = startTimeStr.split(':');
+        final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+        final endParts = endTimeStr.split(':');
+        final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+
+        if (startMinutes <= endMinutes) {
+          return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+        } else {
+          return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+        }
+      } catch (_) {}
+    }
+
+    return true;
+  }
+
   Widget _buildZonesList() {
     if (_pairingCode == "Loading...") return const Center(child: CircularProgressIndicator());
     return StreamBuilder<QuerySnapshot>(
@@ -513,17 +855,20 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (context, i) {
             final z = docs[i].data() as Map<String, dynamic>;
-            final isActive = z['isActive'] ?? false;
+            final bool isCurrentlyActive = _isZoneActiveNow(z);
             final dynamic rawTime = z['createdAt'];
             final Timestamp? ts = rawTime is Timestamp ? rawTime : null;
             final int radius = (z['radiusMeters'] ?? 1000) as int;
+            final bool hasSched = z['hasSchedule'] ?? false;
+            final String? sTime = z['startTime'];
+            final String? eTime = z['endTime'];
 
             return Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
                 side: BorderSide(
-                  color: isActive ? Colors.green.withOpacity(0.25) : Colors.grey.withOpacity(0.1),
+                  color: isCurrentlyActive ? Colors.green.withOpacity(0.25) : Colors.orange.withOpacity(0.25),
                 ),
               ),
               color: Theme.of(context).cardColor,
@@ -536,6 +881,19 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                     _zoneCenter = GeoPoint(zoneLat, zoneLng);
                     _radiusMeters = (z['radiusMeters'] as num).toDouble();
                     _hasCustomCenter = true;
+                    _hasSchedule = hasSched;
+                    if (sTime != null) {
+                      final parts = sTime.split(':');
+                      _startTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+                    }
+                    if (eTime != null) {
+                      final parts = eTime.split(':');
+                      _endTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+                    }
+                    final List<dynamic>? rawDays = z['selectedDays'];
+                    if (rawDays != null) {
+                      _selectedDays = rawDays.map((d) => (d as num).toInt()).toList();
+                    }
                   });
                   _centerMap(zoneLat, zoneLng);
                 },
@@ -545,46 +903,71 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: isActive ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                      color: isCurrentlyActive ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       Icons.location_on_rounded, 
-                      color: isActive ? Colors.green : Colors.grey, 
+                      color: isCurrentlyActive ? Colors.green : Colors.orange, 
                       size: 24
                     ),
                   ),
-                  title: Row(
+                  title: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
                       Text(
                         "zones.perimeter".tr(args: [radius.toString()]),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
-                      const SizedBox(width: 8),
-                      if (isActive)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "ACTIVE",
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 10,
-                              letterSpacing: 0.5,
-                            ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isCurrentlyActive ? Colors.green.withOpacity(0.12) : Colors.orange.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isCurrentlyActive ? "ACTIVE NOW" : "OUTSIDE SCHEDULE",
+                          style: TextStyle(
+                            color: isCurrentlyActive ? Colors.green : Colors.orange.shade800,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 9,
+                            letterSpacing: 0.5,
                           ),
                         ),
+                      ),
                     ],
                   ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      _formatTimestamp(ts),
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _formatTimestamp(ts),
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Icon(
+                              hasSched ? Icons.schedule_rounded : Icons.all_inclusive_rounded,
+                              size: 12,
+                              color: hasSched ? (isCurrentlyActive ? Colors.blue : Colors.orange) : Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              hasSched ? "Schedule: $sTime - $eTime" : "Active All Day (24/7)",
+                              style: TextStyle(
+                                color: hasSched ? (isCurrentlyActive ? Colors.blue.shade700 : Colors.orange.shade800) : Colors.grey.shade600,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   trailing: IconButton(
@@ -670,12 +1053,12 @@ class ZoneLogoPainter extends CustomPainter {
     // 3. Draw inner blue gradient shield (cyan/light blue to royal blue)
     final innerPath = getShieldPath(size, 0.84);
     final rect = Rect.fromCircle(center: Offset(cx, cy), radius: w * 0.40);
-    final gradient = LinearGradient(
+    const gradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        const Color(0xFF38BDF8), // Cyan / Sky blue at top
-        const Color(0xFF1D4ED8), // Royal blue at bottom
+        Color(0xFF38BDF8), // Cyan / Sky blue at top
+        Color(0xFF1D4ED8), // Royal blue at bottom
       ],
     );
     final Paint gradientPaint = Paint()

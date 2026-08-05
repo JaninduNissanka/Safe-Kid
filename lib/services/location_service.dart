@@ -310,7 +310,7 @@ class LocationService {
                   await _sendPushToGuardian(
                     childId,
                     "⚠️ ${anomaly.title}",
-                    "${childName}: ${anomaly.message}",
+                    "$childName: ${anomaly.message}",
                   );
                 }
               } catch (err) {
@@ -452,6 +452,64 @@ class LocationService {
       final double zLat = (zone['centerLat'] as num).toDouble();
       final double zLng = (zone['centerLng'] as num).toDouble();
       final double zRad = (zone['radiusMeters'] as num).toDouble();
+
+      // Check Active Schedule (Time, Days of Week, Date Range)
+      final bool hasSchedule = zone['hasSchedule'] ?? false;
+      if (hasSchedule) {
+        final now = DateTime.now();
+
+        // 1. Date Range Check
+        final bool hasDateRange = zone['hasDateRange'] ?? false;
+        if (hasDateRange) {
+          final String? startDateStr = zone['startDate'];
+          final String? endDateStr = zone['endDate'];
+          if (startDateStr != null && endDateStr != null) {
+            try {
+              final startDt = DateTime.parse(startDateStr);
+              final endDt = DateTime.parse(endDateStr).add(const Duration(days: 1));
+              if (now.isBefore(startDt) || now.isAfter(endDt)) {
+                print("⏰ Zone $zoneId outside active date range ($startDateStr to $endDateStr). Skipping.");
+                continue;
+              }
+            } catch (_) {}
+          }
+        }
+
+        // 2. Days of Week Check
+        final List<dynamic>? selectedDays = zone['selectedDays'];
+        if (selectedDays != null && selectedDays.isNotEmpty) {
+          if (!selectedDays.contains(now.weekday)) {
+            print("⏰ Zone $zoneId outside active weekday (${now.weekday}). Skipping.");
+            continue;
+          }
+        }
+
+        // 3. Time Window Check
+        final String? startTimeStr = zone['startTime'];
+        final String? endTimeStr = zone['endTime'];
+        if (startTimeStr != null && endTimeStr != null) {
+          final currentMinutes = now.hour * 60 + now.minute;
+          
+          final startParts = startTimeStr.split(':');
+          final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+          
+          final endParts = endTimeStr.split(':');
+          final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+          
+          bool isWithinSchedule = false;
+          if (startMinutes <= endMinutes) {
+            isWithinSchedule = currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+          } else {
+            // Overnight window e.g. 22:00 to 06:00
+            isWithinSchedule = currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+          }
+
+          if (!isWithinSchedule) {
+            print("⏰ Zone $zoneId outside active time window ($startTimeStr - $endTimeStr). Skipping.");
+            continue;
+          }
+        }
+      }
 
       final distance = _distanceMeters(lat, lng, zLat, zLng);
       final bool isCurrentlyOutside = distance > zRad;

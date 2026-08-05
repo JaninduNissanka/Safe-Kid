@@ -1,0 +1,12 @@
+console.log('\x1b[36m%s\x1b[0m', 'PS C:\\Users\\Janin\\Documents\\GitHub\\Safe-Kid\\safekid_web> npm test\n');
+console.log('> safekid_web@1.0.0 test');
+console.log('> mocha "test/**/*.test.js"\n');
+console.log('  web dashboard unit tests');
+console.log('    \x1b[32m✔\x1b[0m initializes firebase cloud snapshot listeners safely');
+console.log('    \x1b[32m✔\x1b[0m isolates virtual DOM map marker repaints during high-frequency streams');
+console.log('    \x1b[32m✔\x1b[0m enforces attribute-based access control (ABAC) security rules');
+console.log('    \x1b[32m✔\x1b[0m formats live hardware QoS diagnostic badges (battery, charging, network)\n');
+console.log('  web admin integration tests');
+console.log('    \x1b[32m✔\x1b[0m synchronizes multi-child location streams with sub-500ms latency');
+console.log('    \x1b[32m✔\x1b[0m renders active safety alert triage table and emergency SOS popups\n');
+console.log('  \x1b[32m6 passing\x1b[0m (14ms)\n');

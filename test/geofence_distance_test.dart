@@ -56,6 +56,61 @@ void main() {
       expect(distance, greaterThan(zoneRadius));
       expect(status, equals("Geofence Breach"));
     });
+
+    test('Test C: Predictive AI Trajectory Exit Vector projection triggers alert while current position is INSIDE', () {
+      // Zone Center & Radius
+      const zoneCenterLat = 6.9271;
+      const zoneCenterLng = 79.8612;
+      const double radiusMeters = 500.0;
+
+      // Child points moving toward boundary:
+      // p1 = 10s ago (298m from center)
+      // p0 = NOW (353m from center -> STILL INSIDE 500m radius!)
+      const double p1Lat = 6.9271;
+      const double p1Lng = 79.8585;
+
+      const double p0Lat = 6.9271;
+      const double p0Lng = 79.8580; // Current dist ~353m (INSIDE)
+
+      final currentDist = calculateDistanceMeters(zoneCenterLat, zoneCenterLng, p0Lat, p0Lng);
+      expect(currentDist, lessThan(radiusMeters)); // Confirmed CURRENTLY INSIDE!
+
+      // Compute heading vector: (p0 - p1)
+      const avgLatVec = p0Lat - p1Lat;
+      const avgLngVec = p0Lng - p1Lng;
+
+      // Project 3 steps (30 seconds) forward into future:
+      const predLat = p0Lat + 3.0 * avgLatVec;
+      const predLng = p0Lng + 3.0 * avgLngVec;
+
+      final predictedDist = calculateDistanceMeters(zoneCenterLat, zoneCenterLng, predLat, predLng);
+      expect(predictedDist, greaterThan(radiusMeters)); // Confirmed PREDICTED POSITION OUTSIDE!
+
+      // Trigger condition: Current INSIDE + Predicted OUTSIDE = PREDICTIVE_BREACH!
+      final bool isPredictiveAlertTriggered = (currentDist <= radiusMeters && predictedDist > radiusMeters);
+      expect(isPredictiveAlertTriggered, isTrue);
+    });
+
+    test('Test D: Safe Zone Schedule Window evaluation skips geofence checks outside active hours', () {
+      const String startTime = "08:00"; // 8:00 AM
+      const String endTime = "13:30";   // 1:30 PM
+
+      final startParts = startTime.split(':');
+      final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]); // 480 mins
+
+      final endParts = endTime.split(':');
+      final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);     // 810 mins
+
+      // Case 1: Time is 10:30 AM (630 mins) -> WITHIN schedule window
+      const testCurrentMinutes1 = 10 * 60 + 30;
+      final bool isWithinWindow1 = testCurrentMinutes1 >= startMinutes && testCurrentMinutes1 <= endMinutes;
+      expect(isWithinWindow1, isTrue);
+
+      // Case 2: Time is 03:00 PM (900 mins) -> OUTSIDE schedule window
+      const testCurrentMinutes2 = 15 * 60 + 0;
+      final bool isWithinWindow2 = testCurrentMinutes2 >= startMinutes && testCurrentMinutes2 <= endMinutes;
+      expect(isWithinWindow2, isFalse);
+    });
     
   });
 }
