@@ -32,16 +32,24 @@ class _SimulatedQrScannerScreenState extends State<SimulatedQrScannerScreen> wit
     setState(() => _isScanning = true);
 
     try {
-      // Fetch the most recently created/active parent user doc to get their code
+      // Fetch guardian users without triggering Firestore composite index requirements
       final query = await FirebaseFirestore.instance
           .collection('users')
           .where('role', isEqualTo: 'guardian')
-          .orderBy('createdAt', descending: true)
-          .limit(1)
+          .limit(20)
           .get();
 
       if (query.docs.isNotEmpty) {
-        final parentData = query.docs.first.data();
+        // Sort in Dart memory by createdAt if timestamp is available
+        final sortedDocs = query.docs.toList();
+        sortedDocs.sort((a, b) {
+          final tA = a.data()['createdAt'] as Timestamp?;
+          final tB = b.data()['createdAt'] as Timestamp?;
+          if (tA == null || tB == null) return 0;
+          return tB.compareTo(tA);
+        });
+
+        final parentData = sortedDocs.first.data();
         final code = parentData['pairingCode'] as String?;
         
         // Wait 1.5 seconds for visual scanning laser effect
@@ -53,13 +61,14 @@ class _SimulatedQrScannerScreenState extends State<SimulatedQrScannerScreen> wit
         }
       }
       
-      throw Exception("No active parents found in database");
+      throw Exception("No active parent accounts found in database. Please register a Guardian account first!");
     } catch (e) {
       if (mounted) {
         setState(() => _isScanning = false);
+        final cleanMsg = e.toString().replaceAll("Exception: ", "").replaceAll(RegExp(r'\[.*?\]'), '').trim();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Simulated Scan Failed: $e"),
+            content: Text("Scan Failed: $cleanMsg"),
             backgroundColor: Colors.red,
           ),
         );
