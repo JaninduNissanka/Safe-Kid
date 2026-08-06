@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SimulatedQrScannerScreen extends StatefulWidget {
@@ -8,31 +9,44 @@ class SimulatedQrScannerScreen extends StatefulWidget {
   State<SimulatedQrScannerScreen> createState() => _SimulatedQrScannerScreenState();
 }
 
-class _SimulatedQrScannerScreenState extends State<SimulatedQrScannerScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  bool _isScanning = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-  }
+class _SimulatedQrScannerScreenState extends State<SimulatedQrScannerScreen> {
+  final MobileScannerController _scannerController = MobileScannerController();
+  bool _isDisposed = false;
+  bool _isScanned = false;
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _isDisposed = true;
+    _scannerController.dispose();
     super.dispose();
   }
 
+  void _onDetect(BarcodeCapture capture) {
+    if (_isScanned || _isDisposed) return;
+
+    final List<Barcode> barcodes = capture.barcodes;
+    for (final barcode in barcodes) {
+      final String? rawValue = barcode.rawValue;
+      if (rawValue != null && rawValue.isNotEmpty) {
+        // Extract 6-digit pairing code from scanned QR string
+        final RegExp regExp = RegExp(r'\b\d{6}\b');
+        final match = regExp.firstMatch(rawValue);
+        final String code = match != null ? match.group(0)! : rawValue.trim();
+
+        _isScanned = true;
+        if (mounted) {
+          Navigator.pop(context, code);
+        }
+        break;
+      }
+    }
+  }
+
   void _simulateScan() async {
-    if (_isScanning) return;
-    setState(() => _isScanning = true);
+    if (_isScanned) return;
+    setState(() => _isScanned = true);
 
     try {
-      // Fetch guardian users without triggering Firestore composite index requirements
       final query = await FirebaseFirestore.instance
           .collection('users')
           .where('role', isEqualTo: 'guardian')
@@ -40,7 +54,6 @@ class _SimulatedQrScannerScreenState extends State<SimulatedQrScannerScreen> wit
           .get();
 
       if (query.docs.isNotEmpty) {
-        // Sort in Dart memory by createdAt if timestamp is available
         final sortedDocs = query.docs.toList();
         sortedDocs.sort((a, b) {
           final tA = a.data()['createdAt'] as Timestamp?;
@@ -51,24 +64,21 @@ class _SimulatedQrScannerScreenState extends State<SimulatedQrScannerScreen> wit
 
         final parentData = sortedDocs.first.data();
         final code = parentData['pairingCode'] as String?;
-        
-        // Wait 1.5 seconds for visual scanning laser effect
-        await Future.delayed(const Duration(milliseconds: 1500));
-        
+
         if (mounted && code != null) {
           Navigator.pop(context, code);
           return;
         }
       }
-      
-      throw Exception("No active parent accounts found in database. Please register a Guardian account first!");
+
+      throw Exception("No active parent account found in database.");
     } catch (e) {
       if (mounted) {
-        setState(() => _isScanning = false);
+        setState(() => _isScanned = false);
         final cleanMsg = e.toString().replaceAll("Exception: ", "").replaceAll(RegExp(r'\[.*?\]'), '').trim();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Scan Failed: $cleanMsg"),
+            content: Text("Demo Scan Failed: $cleanMsg"),
             backgroundColor: Colors.red,
           ),
         );
@@ -81,102 +91,119 @@ class _SimulatedQrScannerScreenState extends State<SimulatedQrScannerScreen> wit
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("Simulate QR Scanner", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: const Text("Scan Parent's QR Code", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: ValueListenableBuilder(
+              valueListenable: _scannerController,
+              builder: (context, state, child) {
+                return Icon(
+                  state.torchState == TorchState.on ? Icons.flash_on : Icons.flash_off,
+                  color: Colors.white,
+                );
+              },
+            ),
+            onPressed: () => _scannerController.toggleTorch(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.cameraswitch_rounded, color: Colors.white),
+            onPressed: () => _scannerController.switchCamera(),
+          ),
+        ],
       ),
       body: Stack(
         children: [
-          // Background simulation graphics
-          Center(
-            child: Opacity(
-              opacity: 0.15,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.videocam_outlined, size: 100, color: Colors.white),
-                  const SizedBox(height: 20),
-                  Text(
-                    _isScanning ? "READING MATRIX DATA..." : "VIEWFINDER SIMULATED",
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.5),
-                  )
-                ],
-              ),
-            ),
+          // 1. REAL PHYSICAL CAMERA FEED
+          MobileScanner(
+            controller: _scannerController,
+            onDetect: _onDetect,
+            errorBuilder: (context, error, child) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.camera_alt_outlined, size: 64, color: Colors.white54),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Camera permission required for QR scanning.",
+                        style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _simulateScan,
+                        icon: const Icon(Icons.qr_code_2_rounded),
+                        label: const Text("Use Quick Pairing Code"),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
 
-          // Scanning Target Frame
+          // 2. VIEWFINDER OVERLAY & SCANNING FRAME
           Center(
             child: Container(
-              width: 250,
-              height: 250,
+              width: 260,
+              height: 260,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.orange, width: 4),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Stack(
-                children: [
-                  // Laser Line Animation
-                  AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      return Positioned(
-                        top: 242 * _animationController.value,
-                        left: 10,
-                        right: 10,
-                        child: Container(
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.orange.withOpacity(0.5),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                              )
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFF97316), width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFF97316).withOpacity(0.3),
+                    blurRadius: 20,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
             ),
           ),
 
-          // Bottom simulated action triggers
+          // 3. HELPER INSTRUCTIONS & AUTO-SIMULATE BUTTON
           Positioned(
-            bottom: 50,
-            left: 30,
-            right: 30,
+            bottom: 40,
+            left: 20,
+            right: 20,
             child: Column(
               children: [
-                const Text(
-                  "Point at parent's QR code or tap below to auto-simulate.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    "Point camera at Parent's QR Code",
+                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-                const SizedBox(height: 24),
-                _isScanning
-                    ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.orange))
-                    : ElevatedButton.icon(
-                        onPressed: _simulateScan,
-                        icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-                        label: const Text("SIMULATE SCAN", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                        ),
-                      ),
+                const SizedBox(height: 14),
+                ElevatedButton.icon(
+                  onPressed: _simulateScan,
+                  icon: const Icon(Icons.flash_on_rounded, size: 18),
+                  label: const Text("AUTO-SIMULATE FOR DEMO / TEST"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF97316),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+                ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
