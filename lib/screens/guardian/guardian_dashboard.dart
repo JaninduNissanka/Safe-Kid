@@ -365,19 +365,10 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
   }
 
   void _checkGeofenceStatus() {
-    if (_childPos == null || _circles.isEmpty) return;
-    bool isInsideAny = false;
-    for (var circle in _circles) {
-      final distance = _calculateDistance(_childPos!, circle.center);
-      if (distance <= circle.radius) {
-        isInsideAny = true;
-        break;
-      }
-    }
-    if (isInsideAny && _isOutside) {
-      setState(() => _isOutside = false);
-    } else if (!isInsideAny && !_isOutside) {
-      setState(() => _isOutside = true);
+    if (_childPos == null) return;
+    final bool isOutside = _isChildOutsideGeofence(_childPos!);
+    if (_isOutside != isOutside) {
+      setState(() => _isOutside = isOutside);
     }
   }
 
@@ -1658,9 +1649,13 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
 
   bool _isChildOutsideGeofence(LatLng childPos) {
     if (_circles.isEmpty) return false;
-    final circle = _circles.first;
-    final distance = _calculateDistance(childPos, circle.center);
-    return distance > circle.radius;
+    for (var circle in _circles) {
+      final distance = _calculateDistance(childPos, circle.center);
+      if (distance <= circle.radius) {
+        return false; // Child is safe inside at least one active safe zone!
+      }
+    }
+    return true; // Child is outside all active safe zones
   }
 
   Widget _buildChildSelector() {
