@@ -106,14 +106,60 @@ const Dashboard = () => {
     return () => unsubTimeline();
   }, [pairingCode, selectedChildId]);
 
-  // SMART SAFETY CHECK: Local distance verification across multi-zones
+  const isZoneScheduleActiveNow = (z) => {
+    if (z.isActive === false) return false;
+    if (!z.hasSchedule) return true;
+
+    const now = new Date();
+
+    // 1. Date Range Check
+    if (z.hasDateRange && z.startDate && z.endDate) {
+      try {
+        const startDt = new Date(z.startDate);
+        const endDt = new Date(z.endDate);
+        endDt.setDate(endDt.getDate() + 1); // Inclusive end date
+        if (now < startDt || now > endDt) return false;
+      } catch (_) {}
+    }
+
+    // 2. Days of Week Check (JS day: 0=Sun, 1=Mon...6=Sat. Dart weekday: 1=Mon...7=Sun)
+    if (z.selectedDays && Array.isArray(z.selectedDays) && z.selectedDays.length > 0) {
+      const currentDartDay = now.getDay() === 0 ? 7 : now.getDay();
+      if (!z.selectedDays.includes(currentDartDay)) return false;
+    }
+
+    // 3. Time Window Check
+    if (z.startTime && z.endTime) {
+      try {
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const [startH, startM] = z.startTime.split(':').map(Number);
+        const startMinutes = startH * 60 + startM;
+
+        const [endH, endM] = z.endTime.split(':').map(Number);
+        const endMinutes = endH * 60 + endM;
+
+        if (startMinutes <= endMinutes) {
+          return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+        } else {
+          return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+        }
+      } catch (_) {}
+    }
+
+    return true;
+  };
+
+  // SMART SAFETY CHECK: Local distance verification across multi-zones & active schedules
   useEffect(() => {
     if (!childData || zones.length === 0) return;
     
-    const activeZonesList = zones.filter(z => z.isActive !== false);
-    if (activeZonesList.length === 0) return;
+    const activeScheduledZones = zones.filter(isZoneScheduleActiveNow);
+    if (activeScheduledZones.length === 0) {
+      setIsInsideLocal(true);
+      return;
+    }
 
-    const isInsideAnyZone = activeZonesList.some(z => {
+    const isInsideAnyZone = activeScheduledZones.some(z => {
       const dist = calculateDistance(
         childData.latitude, childData.longitude,
         Number(z.centerLat), Number(z.centerLng)
@@ -167,12 +213,12 @@ const Dashboard = () => {
         >
           {devices.map(child => {
             const isChildSelected = child.id === selectedChildId;
-            const activeZonesList = zones.filter(z => z.isActive !== false);
-            const isInsideAnyZone = activeZonesList.some(z => {
+            const activeScheduledZones = zones.filter(isZoneScheduleActiveNow);
+            const isInsideAnyZone = activeScheduledZones.some(z => {
               const d = calculateDistance(child.latitude, child.longitude, Number(z.centerLat), Number(z.centerLng));
               return d <= Number(z.radiusMeters);
             });
-            const childIsOutside = activeZonesList.length > 0 && !isInsideAnyZone;
+            const childIsOutside = activeScheduledZones.length > 0 && !isInsideAnyZone;
             const isChildSosActive = child.isSosActive;
 
             const markerBgColor = isChildSosActive 
@@ -206,16 +252,16 @@ const Dashboard = () => {
             );
           })}
 
-          {zones.map(z => (
+          {zones.filter(isZoneScheduleActiveNow).map(z => (
             <Circle 
               key={z.id}
               center={{ lat: Number(z.centerLat), lng: Number(z.centerLng) }}
               radius={Number(z.radiusMeters)}
               options={{ 
-                fillColor: z.isActive !== false ? (isActuallyOutside ? '#dc2626' : '#4f46e5') : '#94a3b8', 
-                fillOpacity: z.isActive !== false ? 0.1 : 0.05, 
-                strokeColor: z.isActive !== false ? (isActuallyOutside ? '#dc2626' : '#4f46e5') : '#cbd5e1', 
-                strokeWeight: z.isActive !== false ? 2 : 1 
+                fillColor: isActuallyOutside ? '#dc2626' : '#4f46e5', 
+                fillOpacity: 0.1, 
+                strokeColor: isActuallyOutside ? '#dc2626' : '#cbd5e1', 
+                strokeWeight: 2 
               }}
             />
           ))}
@@ -231,12 +277,12 @@ const Dashboard = () => {
             {devices.map(child => {
               const isChildSelected = child.id === selectedChildId;
               const isChildSosActive = child.isSosActive;
-              const activeZonesList = zones.filter(z => z.isActive !== false);
-              const isInsideAnyZone = activeZonesList.some(z => {
+              const activeScheduledZones = zones.filter(isZoneScheduleActiveNow);
+              const isInsideAnyZone = activeScheduledZones.some(z => {
                 const d = calculateDistance(child.latitude, child.longitude, Number(z.centerLat), Number(z.centerLng));
                 return d <= Number(z.radiusMeters);
               });
-              const childIsOutside = activeZonesList.length > 0 && !isInsideAnyZone;
+              const childIsOutside = activeScheduledZones.length > 0 && !isInsideAnyZone;
 
               let statusColor = 'border-slate-200 text-slate-600 dark:text-slate-400 bg-white/50 dark:bg-slate-850';
               if (isChildSelected) {
@@ -328,24 +374,27 @@ const Dashboard = () => {
           </div>
           
           <div className="space-y-3">
-            {zones.map(z => (
-              <div key={z.id} className={`p-4 rounded-[24px] border transition-all ${z.isActive ? 'border-indigo-200 dark:border-indigo-500/20 bg-white dark:bg-slate-800/50 shadow-md shadow-indigo-100/20' : 'border-slate-100 dark:border-slate-700/50 opacity-40 grayscale'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${z.isActive ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                      <MapIcon className="w-5 h-5" />
+            {zones.map(z => {
+              const isCurrentlyActive = isZoneScheduleActiveNow(z);
+              return (
+                <div key={z.id} className={`p-4 rounded-[24px] border transition-all ${isCurrentlyActive ? 'border-indigo-200 dark:border-indigo-500/20 bg-white dark:bg-slate-800/50 shadow-md shadow-indigo-100/20' : 'border-slate-100 dark:border-slate-700/50 opacity-40 grayscale'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isCurrentlyActive ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                        <MapIcon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-800 dark:text-slate-200">{z.name || t('zoneRadius', { radius: z.radiusMeters })}</p>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${isCurrentlyActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-orange-500'}`}>
+                          {isCurrentlyActive ? t('activelyMonitoring') : 'OUTSIDE SCHEDULE'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-200">{z.name || t('zoneRadius', { radius: z.radiusMeters })}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                        {z.isActive ? t('activelyMonitoring') : t('inactive')}
-                      </p>
-                    </div>
+                    {isCurrentlyActive && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shadow-[0_0_10px_rgba(79,70,229,0.5)]" />}
                   </div>
-                  {z.isActive && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shadow-[0_0_10px_rgba(79,70,229,0.5)]" />}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
