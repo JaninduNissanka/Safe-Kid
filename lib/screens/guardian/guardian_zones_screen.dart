@@ -50,10 +50,14 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
     _loadCode();
   }
 
+  final TextEditingController _zoneNameController = TextEditingController(text: "School Zone");
+  String _selectedCategory = "School";
+
   @override
   void dispose() {
     _childLocSub?.cancel();
     _searchController.dispose();
+    _zoneNameController.dispose();
     super.dispose();
   }
 
@@ -99,20 +103,17 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
 
     try {
       final zonesRef = _db.collection('zones').doc(_pairingCode).collection('items');
-      final oldZones = await zonesRef.where('isActive', isEqualTo: true).get();
-      final batch = _db.batch();
-      for (var doc in oldZones.docs) {
-        batch.update(doc.reference, {'isActive': false});
-      }
+      final String nameInput = _zoneNameController.text.trim();
+      final String finalZoneName = nameInput.isEmpty ? "$_selectedCategory Zone" : nameInput;
 
       final String startStr = "${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}";
       final String endStr = "${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}";
       final String startDateStr = "${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}";
       final String endDateStr = "${_endDate.year}-${_endDate.month.toString().padLeft(2, '0')}-${_endDate.day.toString().padLeft(2, '0')}";
 
-      final newZoneRef = zonesRef.doc();
-      batch.set(newZoneRef, {
-        'name': 'Active Safe Zone',
+      await zonesRef.add({
+        'name': finalZoneName,
+        'category': _selectedCategory,
         'centerLat': _zoneCenter.latitude,
         'centerLng': _zoneCenter.longitude,
         'radiusMeters': _radiusMeters.round(),
@@ -127,7 +128,6 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
         'isActive': true,
       });
 
-      await batch.commit();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("zones.synced".tr())));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
@@ -136,8 +136,35 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
     }
   }
 
+  Future<void> _toggleZoneActive(String docId, bool currentActive) async {
+    await _db.collection('zones').doc(_pairingCode).collection('items').doc(docId).update({
+      'isActive': !currentActive,
+    });
+  }
+
   Future<void> _deleteZone(String docId) async {
     await _db.collection('zones').doc(_pairingCode).collection('items').doc(docId).delete();
+  }
+
+  Widget _buildCategoryChip(String cat, String label) {
+    final isSelected = _selectedCategory == cat;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: FilterChip(
+        selected: isSelected,
+        label: Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.blue.shade900, fontSize: 12)),
+        selectedColor: Colors.blue,
+        backgroundColor: Colors.blue.withOpacity(0.08),
+        onSelected: (val) {
+          setState(() {
+            _selectedCategory = cat;
+            if (_zoneNameController.text.isEmpty || _zoneNameController.text.contains("Zone")) {
+              _zoneNameController.text = "$cat Zone";
+            }
+          });
+        },
+      ),
+    );
   }
 
   Future<void> _searchLocation(String query) async {
@@ -238,6 +265,46 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                           style: TextStyle(
                             color: Colors.grey.shade500,
                             fontSize: 12,
+                          ),
+                        ),
+                        // Zone Name & Category Selector Card
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Zone Label & Category", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              const SizedBox(height: 8),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _buildCategoryChip("School", "🏫 School"),
+                                    _buildCategoryChip("Home", "🏡 Home"),
+                                    _buildCategoryChip("Tuition", "📚 Tuition"),
+                                    _buildCategoryChip("Park", "🛝 Park"),
+                                    _buildCategoryChip("Custom", "⭐ Custom"),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: _zoneNameController,
+                                style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontWeight: FontWeight.bold),
+                                decoration: InputDecoration(
+                                  labelText: "Zone Name",
+                                  hintText: "e.g. Royal College, Homagama Home",
+                                  prefixIcon: const Icon(Icons.label_important_outline, color: Colors.blue),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -520,7 +587,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                                     ),
                                     Switch(
                                       value: _hasSchedule,
-                                      activeColor: Colors.blue,
+                                      activeThumbColor: Colors.blue,
                                       onChanged: (val) {
                                         setState(() {
                                           _hasSchedule = val;
@@ -634,7 +701,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                                       Text("Limit to Calendar Date Range", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyMedium?.color)),
                                       Switch(
                                         value: _hasDateRange,
-                                        activeColor: Colors.blue,
+                                        activeThumbColor: Colors.blue,
                                         onChanged: (v) => setState(() => _hasDateRange = v),
                                       ),
                                     ],
@@ -918,7 +985,7 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                     runSpacing: 4,
                     children: [
                       Text(
-                        "zones.perimeter".tr(args: [radius.toString()]),
+                        "${z['name'] ?? 'Safe Zone'} ($radius m)",
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       Container(
@@ -970,9 +1037,19 @@ class _GuardianZonesScreenState extends State<GuardianZonesScreen> {
                       ],
                     ),
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                    onPressed: () => _deleteZone(docs[i].id),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Switch(
+                        value: z['isActive'] ?? true,
+                        activeColor: Colors.green,
+                        onChanged: (val) => _toggleZoneActive(docs[i].id, z['isActive'] ?? true),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                        onPressed: () => _deleteZone(docs[i].id),
+                      ),
+                    ],
                   ),
                 ),
               ),

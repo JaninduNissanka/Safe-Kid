@@ -443,15 +443,15 @@ class LocationService {
     }
   }
 
-  // Requirement 3 & 4: Geofence Lifecycle Logic
+  // Requirement 3 & 4: Geofence Lifecycle Logic (Multi Safe Zone aware)
   Future<void> _processAllGeofences(String childId, String childName, double lat, double lng) async {
     if (_pairingCode == null || _activeZones.isEmpty) return;
 
+    final List<Map<String, dynamic>> scheduledActiveZones = [];
+
     for (var zone in _activeZones) {
-      final String zoneId = zone['id'];
-      final double zLat = (zone['centerLat'] as num).toDouble();
-      final double zLng = (zone['centerLng'] as num).toDouble();
-      final double zRad = (zone['radiusMeters'] as num).toDouble();
+      final bool isActive = zone['isActive'] ?? true;
+      if (!isActive) continue;
 
       // Check Active Schedule (Time, Days of Week, Date Range)
       final bool hasSchedule = zone['hasSchedule'] ?? false;
@@ -467,10 +467,7 @@ class LocationService {
             try {
               final startDt = DateTime.parse(startDateStr);
               final endDt = DateTime.parse(endDateStr).add(const Duration(days: 1));
-              if (now.isBefore(startDt) || now.isAfter(endDt)) {
-                print("⏰ Zone $zoneId outside active date range ($startDateStr to $endDateStr). Skipping.");
-                continue;
-              }
+              if (now.isBefore(startDt) || now.isAfter(endDt)) continue;
             } catch (_) {}
           }
         }
@@ -478,10 +475,7 @@ class LocationService {
         // 2. Days of Week Check
         final List<dynamic>? selectedDays = zone['selectedDays'];
         if (selectedDays != null && selectedDays.isNotEmpty) {
-          if (!selectedDays.contains(now.weekday)) {
-            print("⏰ Zone $zoneId outside active weekday (${now.weekday}). Skipping.");
-            continue;
-          }
+          if (!selectedDays.contains(now.weekday)) continue;
         }
 
         // 3. Time Window Check
@@ -489,82 +483,97 @@ class LocationService {
         final String? endTimeStr = zone['endTime'];
         if (startTimeStr != null && endTimeStr != null) {
           final currentMinutes = now.hour * 60 + now.minute;
-          
           final startParts = startTimeStr.split(':');
           final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
-          
           final endParts = endTimeStr.split(':');
           final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
-          
+
           bool isWithinSchedule = false;
           if (startMinutes <= endMinutes) {
             isWithinSchedule = currentMinutes >= startMinutes && currentMinutes <= endMinutes;
           } else {
-            // Overnight window e.g. 22:00 to 06:00
             isWithinSchedule = currentMinutes >= startMinutes || currentMinutes <= endMinutes;
           }
 
-          if (!isWithinSchedule) {
-            print("⏰ Zone $zoneId outside active time window ($startTimeStr - $endTimeStr). Skipping.");
-            continue;
-          }
+          if (!isWithinSchedule) continue;
         }
       }
 
+      scheduledActiveZones.add(zone);
+    }
+
+    if (scheduledActiveZones.isEmpty) return;
+
+    // Check if child is inside AT LEAST ONE of the currently scheduled active zones
+    bool isInsideAnyZone = false;
+    double minDistance = double.infinity;
+    Map<String, dynamic>? nearestZone;
+
+    for (var zone in scheduledActiveZones) {
+      final double zLat = (zone['centerLat'] as num).toDouble();
+      final double zLng = (zone['centerLng'] as num).toDouble();
+      final double zRad = (zone['radiusMeters'] as num).toDouble();
       final distance = _distanceMeters(lat, lng, zLat, zLng);
-      final bool isCurrentlyOutside = distance > zRad;
 
-      print("📏 Zone $zoneId Check: Dist ${distance.round()}m / Rad ${zRad.round()}m | Outside: $isCurrentlyOutside");
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestZone = zone;
+      }
 
-      // Logic for EXIT
-      if (isCurrentlyOutside) {
-        // Requirement 3: Increment Dwell/Hysteresis counter
-        _jitterCounters[zoneId] = (_jitterCounters[zoneId] ?? 0) + 1;
-        print("📉 Jitter count for $zoneId: ${_jitterCounters[zoneId]} (Need 2)");
+      if (distance <= zRad) {
+        isInsideAnyZone = true;
+      }
+    }
 
-        // If outside for 2 consecutive counts AND no active alert exists
-        if (_jitterCounters[zoneId]! >= 2 && _activeExitAlertIds[zoneId] == null) {
-          await _triggerExitAlert(childId, childName, zoneId, zRad, distance);
-        }
-      } 
-      // Logic for RETURN (Inside)
-      else {
-        _jitterCounters[zoneId] = 0; // Reset jitter
+    final String primaryZoneId = nearestZone?['id'] ?? scheduledActiveZones.first['id'];
+    final String primaryZoneName = nearestZone?['name'] ?? 'Safe Zone';
+    final double primaryRadius = (nearestZone?['radiusMeters'] as num?)?.toDouble() ?? 1000.0;
 
-        // Requirement 4: Resolve any active alerts when child is inside
-        await _resolveExitAlert(zoneId, childName);
+    print("📏 Multi-Zone Check: Inside Any Zone: $isInsideAnyZone | Nearest: $primaryZoneName (${minDistance.round()}m)");
+
+    if (!isInsideAnyZone) {
+      _jitterCounters[primaryZoneId] = (_jitterCounters[primaryZoneId] ?? 0) + 1;
+
+      if (_jitterCounters[primaryZoneId]! >= 2 && _activeExitAlertIds[primaryZoneId] == null) {
+        await _triggerExitAlert(childId, childName, primaryZoneId, primaryRadius, minDistance, primaryZoneName);
+      }
+    } else {
+      _jitterCounters.clear();
+      for (var z in scheduledActiveZones) {
+        await _resolveExitAlert(z['id'], childName);
       }
     }
   }
 
-  Future<void> _triggerExitAlert(String childId, String childName, String zoneId, double radius, double dist) async {
+  Future<void> _triggerExitAlert(String childId, String childName, String zoneId, double radius, double dist, [String zoneName = "Safe Zone"]) async {
     final alertRef = _db.collection('alerts').doc(_pairingCode!).collection('items').doc();
     _activeExitAlertIds[zoneId] = alertRef.id;
 
     await alertRef.set({
       'type': 'GEOFENCE_EXIT',
-      'title': 'Safe Zone Departure',
-      'message': '$childName moved outside the boundary (${radius.round()}m).',
+      'title': 'Safe Zone Departure ($zoneName)',
+      'message': '$childName moved outside $zoneName boundary (${radius.round()}m).',
       'status': 'active',
       'createdAt': FieldValue.serverTimestamp(),
       'childId': childName.toLowerCase(),
       'childName': childName,
       'zoneId': zoneId,
+      'zoneName': zoneName,
       'distanceMeters': dist.round(),
     });
 
     await _addTimelineEvent(
       childName: childName,
       type: 'alert_geofence',
-      title: 'Left Safe Zone',
-      message: '$childName exited the safe zone boundary.',
+      title: 'Left $zoneName',
+      message: '$childName exited the $zoneName boundary.',
       value: dist.round(),
     );
 
     // Requirement: Send Push Notification even if app is closed
-    await _sendPushToGuardian(childId, "⚠️ Safe Zone Alert", "$childName has left the safe zone!");
+    await _sendPushToGuardian(childId, "⚠️ Safe Zone Alert", "$childName has left the $zoneName boundary!");
 
-    print("🚨 EXIT CONFIRMED (3/3): $zoneId");
+    print("🚨 EXIT CONFIRMED: $zoneName ($zoneId)");
   }
 
   // PROFESSIONAL FCM TRIGGER: 

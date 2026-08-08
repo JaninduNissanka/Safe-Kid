@@ -164,11 +164,12 @@ const Dashboard = () => {
         >
           {devices.map(child => {
             const isChildSelected = child.id === selectedChildId;
-            const activeZone = zones.find(z => z.isActive);
-            const dist = activeZone 
-              ? calculateDistance(child.latitude, child.longitude, Number(activeZone.centerLat), Number(activeZone.centerLng))
-              : 0;
-            const childIsOutside = activeZone && dist > Number(activeZone.radiusMeters);
+            const activeZonesList = zones.filter(z => z.isActive !== false);
+            const isInsideAnyZone = activeZonesList.some(z => {
+              const d = calculateDistance(child.latitude, child.longitude, Number(z.centerLat), Number(z.centerLng));
+              return d <= Number(z.radiusMeters);
+            });
+            const childIsOutside = activeZonesList.length > 0 && !isInsideAnyZone;
             const isChildSosActive = child.isSosActive;
 
             const markerBgColor = isChildSosActive 

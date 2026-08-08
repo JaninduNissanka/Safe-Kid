@@ -366,11 +366,17 @@ class _GuardianDashboardState extends State<GuardianDashboard> {
 
   void _checkGeofenceStatus() {
     if (_childPos == null || _circles.isEmpty) return;
-    final circle = _circles.first;
-    final distance = _calculateDistance(_childPos!, circle.center);
-    if (distance <= circle.radius && _isOutside) {
+    bool isInsideAny = false;
+    for (var circle in _circles) {
+      final distance = _calculateDistance(_childPos!, circle.center);
+      if (distance <= circle.radius) {
+        isInsideAny = true;
+        break;
+      }
+    }
+    if (isInsideAny && _isOutside) {
       setState(() => _isOutside = false);
-    } else if (distance > circle.radius) {
+    } else if (!isInsideAny && !_isOutside) {
       setState(() => _isOutside = true);
     }
   }

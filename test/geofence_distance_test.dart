@@ -111,6 +111,34 @@ void main() {
       final bool isWithinWindow2 = testCurrentMinutes2 >= startMinutes && testCurrentMinutes2 <= endMinutes;
       expect(isWithinWindow2, isFalse);
     });
+
+    test('Test E: Multi Safe Zone evaluation (Child inside Zone B while outside Zone A evaluates to SAFE)', () {
+      // Zone A: Home at (6.9271, 79.8612), radius 500m
+      const zoneALat = 6.9271;
+      const zoneALng = 79.8612;
+      const zoneARadius = 500.0;
+
+      // Zone B: School at (6.8455, 80.0035), radius 1000m
+      const zoneBLat = 6.8455;
+      const zoneBLng = 80.0035;
+      const zoneBRadius = 1000.0;
+
+      // Child is at School (6.8456, 80.0036) -> ~15 meters from School center, ~18 km from Home
+      const childLat = 6.8456;
+      const childLng = 80.0036;
+
+      final distA = calculateDistanceMeters(zoneALat, zoneALng, childLat, childLng);
+      final distB = calculateDistanceMeters(zoneBLat, zoneBLng, childLat, childLng);
+
+      final bool isInsideZoneA = distA <= zoneARadius;
+      final bool isInsideZoneB = distB <= zoneBRadius;
+
+      final bool isChildSafeOverall = isInsideZoneA || isInsideZoneB;
+
+      expect(isInsideZoneA, isFalse);
+      expect(isInsideZoneB, isTrue);
+      expect(isChildSafeOverall, isTrue);
+    });
     
   });
 }
