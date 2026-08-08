@@ -106,19 +106,22 @@ const Dashboard = () => {
     return () => unsubTimeline();
   }, [pairingCode, selectedChildId]);
 
-  // SMART SAFETY CHECK: Local distance verification
+  // SMART SAFETY CHECK: Local distance verification across multi-zones
   useEffect(() => {
     if (!childData || zones.length === 0) return;
     
-    const activeZone = zones.find(z => z.isActive);
-    if (!activeZone) return;
+    const activeZonesList = zones.filter(z => z.isActive !== false);
+    if (activeZonesList.length === 0) return;
 
-    const dist = calculateDistance(
-      childData.latitude, childData.longitude,
-      Number(activeZone.centerLat), Number(activeZone.centerLng)
-    );
+    const isInsideAnyZone = activeZonesList.some(z => {
+      const dist = calculateDistance(
+        childData.latitude, childData.longitude,
+        Number(z.centerLat), Number(z.centerLng)
+      );
+      return dist <= Number(z.radiusMeters);
+    });
 
-    setIsInsideLocal(dist <= Number(activeZone.radiusMeters));
+    setIsInsideLocal(isInsideAnyZone);
   }, [childData, zones]);
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -140,7 +143,7 @@ const Dashboard = () => {
 
   if (!isLoaded) return <div className="h-screen bg-slate-900 text-white flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
-  const isActuallyOutside = activeAlerts.length > 0 && !isInsideLocal;
+  const isActuallyOutside = zones.length > 0 && !isInsideLocal;
   const isSafe = !isActuallyOutside;
 
   return (
@@ -209,10 +212,10 @@ const Dashboard = () => {
               center={{ lat: Number(z.centerLat), lng: Number(z.centerLng) }}
               radius={Number(z.radiusMeters)}
               options={{ 
-                fillColor: z.isActive ? (isActuallyOutside ? '#dc2626' : '#4f46e5') : '#94a3b8', 
-                fillOpacity: z.isActive ? 0.1 : 0.05, 
-                strokeColor: z.isActive ? (isActuallyOutside ? '#dc2626' : '#4f46e5') : '#cbd5e1', 
-                strokeWeight: z.isActive ? 2 : 1 
+                fillColor: z.isActive !== false ? (isActuallyOutside ? '#dc2626' : '#4f46e5') : '#94a3b8', 
+                fillOpacity: z.isActive !== false ? 0.1 : 0.05, 
+                strokeColor: z.isActive !== false ? (isActuallyOutside ? '#dc2626' : '#4f46e5') : '#cbd5e1', 
+                strokeWeight: z.isActive !== false ? 2 : 1 
               }}
             />
           ))}
@@ -228,11 +231,12 @@ const Dashboard = () => {
             {devices.map(child => {
               const isChildSelected = child.id === selectedChildId;
               const isChildSosActive = child.isSosActive;
-              const activeZone = zones.find(z => z.isActive);
-              const dist = activeZone 
-                ? calculateDistance(child.latitude, child.longitude, Number(activeZone.centerLat), Number(activeZone.centerLng))
-                : 0;
-              const childIsOutside = activeZone && dist > Number(activeZone.radiusMeters);
+              const activeZonesList = zones.filter(z => z.isActive !== false);
+              const isInsideAnyZone = activeZonesList.some(z => {
+                const d = calculateDistance(child.latitude, child.longitude, Number(z.centerLat), Number(z.centerLng));
+                return d <= Number(z.radiusMeters);
+              });
+              const childIsOutside = activeZonesList.length > 0 && !isInsideAnyZone;
 
               let statusColor = 'border-slate-200 text-slate-600 dark:text-slate-400 bg-white/50 dark:bg-slate-850';
               if (isChildSelected) {
@@ -332,7 +336,7 @@ const Dashboard = () => {
                       <MapIcon className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-200">{t('zoneRadius', { radius: z.radiusMeters })}</p>
+                      <p className="text-sm font-black text-slate-800 dark:text-slate-200">{z.name || t('zoneRadius', { radius: z.radiusMeters })}</p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                         {z.isActive ? t('activelyMonitoring') : t('inactive')}
                       </p>
